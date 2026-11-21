@@ -1,0 +1,41 @@
+# bioeval-guard
+
+Deterministic dataset hygiene, biological sequence verification, and zero-question shortcut auditing for frontier AI biosecurity and biology benchmarks (`LAB-Bench`, `WMDP`, `BixBench`, and `Inspect AI` pipelines).
+
+## Why This Exists
+
+Frontier biosecurity evaluations inform model release gates, safeguards thresholds, and safety claims. Auditing **3,428 public evaluation items** across `futurehouse/lab-bench` (`5c77cec6`), `cais/wmdp` (`7125571f`), and `futurehouse/BixBench` (`f8cc3bdc`) with **zero LLM calls (`$0` API)** and strictly out-of-fold / Holm-Bonferroni controls revealed both severe shortcut vulnerabilities and surprisingly clean control subsets:
+
+| Benchmark / Subset | N | Chance | Centroid | Longest | 5-Fold OOF | Holm `p_adj` | Key Integrity Findings |
+|---|---:|---:|---:|---:|---:|---:|---|
+| `WMDP/bio` | 1,273 | 25.0% | 21.3% | **46.1%** | **45.8%** | **`1.16e-58`** (`Longest`) / `5.72e-57` (`OOF`) | Longest-option length bias (`+21.1 pp`), `14` ideal-only meta-options (`All of the above` `11/12` ideal) |
+| `LAB-Bench/SeqQA` | 600 | 24.7% | **44.5%** | 27.3% | **41.2%** | **`3.61e-25`** (`Centroid`) | `PCR_ORF` subset (`N=480`): **49.6%** Centroid; `non_PCR_ORF` (`N=120`): 20.8% (`clean`). `40/40` sense reverse primers (`PCR-seq-enzprimers`), `8` isoschizomer collisions, `1` exact `ideal==distractor` (`ded3f6ac`) |
+| `LAB-Bench/DbQA` | 520 | 25.0% | **35.4%** | 23.5% | **37.7%** | **`1.23e-09`** (`OOF`) | `variant_multi_sequence_task` (`N=80`): **100.0% (`80/80`)** edit-distance centroid (single-AA star-graph perturbations) |
+| `LAB-Bench/LitQA2` | 199 | 24.4% | 26.6% | 24.6% | 26.6% | `1.00` (clean shortcuts) | **`5/199` literal `"null"` `ideal` answers**, `2` comma-split distractor shards (`'12,300'` vs `'4','900'...`), `2` duplicate distractors |
+| `WMDP/chem` | 408 | 25.0% | 29.7% | 30.9% | 30.1% | `0.114` (n.s.) | Passes Holm-Bonferroni threshold after correction; `2` ideal-only meta-options |
+| `BixBench` | 205 | 25.0% | 25.9% | 24.4% | 25.4% | `1.00` (clean shortcuts) | Strongest option-geometry resistance; `2` `str_verifier` notation mismatches, `6` overlapping `range_verifier` boundaries |
+
+## Installation
+
+```bash
+pip install -e .
+```
+
+## Quickstart
+
+```bash
+bioeval-guard summary datasets/wmdp_bio.parquet datasets/lab_bench_SeqQA.parquet datasets/lab_bench_DbQA.parquet datasets/BixBench.jsonl
+```
+
+### Inspect AI Pre-Filter Usage
+
+```python
+from bioeval_guard.inspect_adapter import sanitize_mcq_dataset, question_blind_centroid_baseline
+
+clean_records, hygiene_report = sanitize_mcq_dataset(records, dataset_name="SeqQA")
+```
+
+## Author & Contact
+
+- **Author:** Göktuğ Özkan, MD (`drozkan2@gmail.com`, ORCID: `0000-0002-5022-9124`)
+- **License:** MIT
