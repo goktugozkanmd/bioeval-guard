@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from .grader_audit import run_reference_self_check
 from .hygiene import (
     check_bixbench_hygiene,
     check_mcq_hygiene,
@@ -73,7 +74,27 @@ def build_parser() -> argparse.ArgumentParser:
     ps = sub.add_parser("summary", help="Audit multiple dataset files and emit Markdown table.")
     ps.add_argument("paths", nargs="+", type=Path, help="Paths to Parquet/JSONL files.")
     ps.add_argument("--json-out", type=Path, default=None, help="Optional JSON output path.")
+
+    psc = sub.add_parser("self-check", help="Verify reference hardened vs vulnerable grader/screener checks.")
+    psc.add_argument("--json", action="store_true", help="Emit JSON output.")
     return parser
+
+
+def format_self_check_markdown(report: dict[str, Any]) -> str:
+    """Format self-check auditor summary as Markdown."""
+    lines = [
+        "| Auditor | Probes | Passed | Status |",
+        "|---|---:|---:|---|",
+    ]
+    for row in report["hardened"]:
+        lines.append(
+            f"| {row['auditor']} | {row['probes_run']} | {'PASS' if row['passed'] else 'FAIL'} | hardened |"
+        )
+    lines.append(
+        f"| vulnerable_regression_probes | {report['vulnerable_total']} | "
+        f"{report['vulnerable_caught']}/{report['vulnerable_total']} caught | PASS |"
+    )
+    return "\n".join(lines)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -94,6 +115,14 @@ def main(argv: list[str] | None = None) -> int:
         if args.json_out:
             args.json_out.write_text(json.dumps(results, indent=2), encoding="utf-8")
         return 0
+
+    if args.command == "self-check":
+        report = run_reference_self_check()
+        if args.json:
+            print(json.dumps(report, indent=2))
+        else:
+            print(format_self_check_markdown(report))
+        return 0 if report["hardened_all_passed"] else 1
 
     return 1
 

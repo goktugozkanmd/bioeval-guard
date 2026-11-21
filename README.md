@@ -27,13 +27,27 @@ pip install -e .
 bioeval-guard summary datasets/wmdp_bio.parquet datasets/lab_bench_SeqQA.parquet datasets/lab_bench_DbQA.parquet datasets/BixBench.jsonl
 ```
 
-### Inspect AI Pre-Filter Usage
+### Inspect AI Pre-Filter & Register-Ready Usage
 
 ```python
 from bioeval_guard.inspect_adapter import sanitize_mcq_dataset, question_blind_centroid_baseline
+from bioeval_guard.inspect_tasks import filter_clean_lab_bench_records, nan_safe_precision_metric
 
 clean_records, hygiene_report = sanitize_mcq_dataset(records, dataset_name="SeqQA")
 ```
+
+### v0.2.0 Grader, Parser & Defensive DNA-Screening Symmetry Auditors
+
+```bash
+bioeval-guard self-check
+```
+
+`bioeval_guard.grader_audit` adds deterministic zero-API probes for:
+- **Safety judge callables** (`audit_safety_judge_callable`): detects case-sensitive `"Unsafe"`/`"UNSAFE"` fallthrough-to-safe bugs, code-fenced JSON, and empty refusal completions.
+- **XML `<answer>` parsers** (`audit_answer_tag_parser`): detects `str.find()` negative-slice corruption on untagged/unclosed prose and CoT prompt-echo collisions.
+- **Numeric string graders** (`audit_numeric_string_verifier`): flags sign/decimal/exponent stripping (`-4.96` == `4.96`) and empty-string substring false positives.
+- **Selective precision metrics** (`audit_selective_precision_metric`): distinguishes 100%-abstention (`NaN` precision, `0.0` coverage) from 100%-incorrect (`0.0` precision, `1.0` coverage).
+- **Defensive DNA screener invariance** (`audit_dna_screener_symmetry`): verifies reverse-complement, FASTA/CRLF, and window-shift parity using strictly benign synthetic oligos (zero pathogen sequences).
 
 ## Author & Contact
 

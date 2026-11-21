@@ -11,6 +11,17 @@ import pyarrow.parquet as pq
 import pytest
 
 from bioeval_guard.cli import format_markdown_summary, main
+from bioeval_guard.grader_audit import (
+    audit_answer_tag_parser,
+    audit_dna_screener_symmetry,
+    audit_numeric_string_verifier,
+    audit_safety_judge_callable,
+    audit_selective_precision_metric,
+    case_safe_judge_label,
+    nan_safe_selective_precision,
+    parse_tagged_answer_strict,
+    run_reference_self_check,
+)
 from bioeval_guard.hygiene import (
     AuditItem,
     check_bixbench_hygiene,
@@ -26,6 +37,12 @@ from bioeval_guard.inspect_adapter import (
     make_inspect_sample_filter,
     question_blind_centroid_baseline,
     sanitize_mcq_dataset,
+)
+from bioeval_guard.inspect_tasks import (
+    LAB_BENCH_REVISION_PIN,
+    compute_nan_safe_precision_and_coverage,
+    filter_clean_lab_bench_records,
+    nan_safe_precision_metric,
 )
 from bioeval_guard.shortcuts import (
     audit_question_blind_shortcuts,
@@ -356,3 +373,75 @@ def test_cli_audit_jsonl_json_and_summary(tmp_path: Path, capsys: pytest.Capture
 
 def test_format_markdown_empty() -> None:
     assert format_markdown_summary([]) == "No datasets audited."
+
+
+def test_grader_auditors_detect_real_defects_and_pass_hardened() -> None:
+    # 1. Safety judge auditor
+    bad_judge = audit_safety_judge_callable(lambda s: "unsafe" if '"label": "unsafe"' in s else "safe")
+    assert bad_judge["passed"] is False
+    assert len(bad_judge["failures"]) == 5
+    good_judge = audit_safety_judge_callable(case_safe_judge_label)
+    assert good_judge["passed"] is True
+
+    # 2. Tag parser auditor
+    bad_parser = audit_answer_tag_parser(lambda s: s[s.find("<answer>") + 8 : s.find("</answer>")])
+    assert bad_parser["passed"] is False
+    good_parser = audit_answer_tag_parser(lambda s: parse_tagged_answer_strict(s, strip_upper=True))
+    assert good_parser["passed"] is True
+
+    # 3. Numeric string verifier auditor
+    import re
+
+    bad_num = audit_numeric_string_verifier(
+        lambda t, p: re.sub(r"[^a-zA-Z0-9]", "", t).lower() == re.sub(r"[^a-zA-Z0-9]", "", p).lower()
+    )
+    assert bad_num["passed"] is False
+    good_num = audit_numeric_string_verifier(lambda t, p: t.strip() == p.strip() and t.strip() != "")
+    assert good_num["passed"] is True
+
+    # 4. Selective precision metric auditor
+    bad_metric = audit_selective_precision_metric(
+        lambda xs: 0.0 if not [x for x in xs if x != -1] else sum(x for x in xs if x != -1) / len([x for x in xs if x != -1]),
+        lambda xs: len([x for x in xs if x != -1]) / len(xs) if xs else 0.0,
+    )
+    assert bad_metric["passed"] is False
+    good_metric = audit_selective_precision_metric(
+        lambda xs: nan_safe_selective_precision([float(x) for x in xs if x != -1], len(xs))[0],
+        lambda xs: nan_safe_selective_precision([float(x) for x in xs if x != -1], len(xs))[1],
+    )
+    assert good_metric["passed"] is True
+
+    # 5. Defensive benign oligo symmetry auditor
+    asymmetric = audit_dna_screener_symmetry(lambda s: "CTAGCGATGCTAGCTAGTCG" in s)
+    assert asymmetric["passed"] is False
+
+
+def test_inspect_tasks_helpers_and_self_check_cli(capsys: pytest.CaptureFixture[str]) -> None:
+    import math
+
+    assert LAB_BENCH_REVISION_PIN() == "5c77cec648430f30611808808861eb86f81d5eaa"
+    prec, cov = compute_nan_safe_precision_and_coverage(["N", "N", "N"])
+    assert math.isnan(prec) and cov == 0.0
+    fallback = nan_safe_precision_metric()
+    assert math.isnan(fallback([-1, -1]))
+
+    kept, rep = filter_clean_lab_bench_records(
+        [
+            {"id": "k1", "question": "Q1", "ideal": "null", "distractors": ["A", "B", "C"]},
+            {"id": "k2", "question": "Q2", "ideal": "BRCA1", "distractors": ["TP53", "EGFR", "MYC"]},
+        ],
+        subset_name="LitQA2",
+        check_biology=False,
+    )
+    assert [r["id"] for r in kept] == ["k2"]
+    assert rep["removed_items"] == 1
+
+    self_rep = run_reference_self_check()
+    assert self_rep["hardened_all_passed"] is True
+    assert self_rep["vulnerable_caught"] == self_rep["vulnerable_total"] == 3
+
+    assert main(["self-check", "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["hardened_all_passed"] is True
+    assert main(["self-check"]) == 0
+    assert "| dna_screener_symmetry |" in capsys.readouterr().out
