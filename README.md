@@ -60,6 +60,15 @@ bioeval-guard cluster-audit capsules.jsonl
 - **MCQ Option-Text Inversion Auditor** (`audit_mcq_option_text_grader` & `hardened_mcq_option_grader`): catches `location="end"` option-text hijack vulnerabilities (e.g., `"C. extrachromosomal dna"` matching target `"A"`).
 - **Cluster-Robust Benchmark SE/ICC/DEFF Auditor** (`audit_clustered_benchmark_se`): quantifies cluster-inflated precision on correlated multi-question capsules (`BixBench`, `LAB-Bench`).
 
+### v0.5.0 Pathogen Metagenomic Surveillance & Unparseable Judge NaN Auditors
+
+```bash
+bioeval-guard surveillance-audit
+```
+
+- **6-Invariant Metagenomic Surveillance Auditor** (`bioeval_guard.metagenomic_surveillance_audit` & `DefensiveMetagenomicScreener`): audits host-chimera junction retention (`>=31 bp` non-host overhangs), strict zero-padded multiplex barcode canonicalization, fail-closed sample-sheet file existence checks, LCA alert-candidate preservation, spike-in compositional invariance under `100x` flora bloom, and paired-mate strand symmetry on strictly benign synthetic controls.
+- **Unparseable Judge NaN Auditor** (`audit_unparseable_judge_nan_handling` & `unparseable_safe_nan_judge_score`): catches empty/content-filtered/malformed judge completions silently collapsing to `0.0` instead of `NaN`.
+
 ## Author & Contact
 
 - **Author:** Göktuğ Özkan, MD (`drozkan2@gmail.com`, ORCID: `0000-0002-5022-9124`)

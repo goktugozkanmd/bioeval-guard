@@ -16,6 +16,7 @@ from .hygiene import (
     load_records,
     normalize_items,
 )
+from .metagenomic_surveillance_audit import run_surveillance_self_check
 from .sequence_screening_audit import run_screening_self_check
 from .shortcuts import audit_question_blind_shortcuts, holm_bonferroni
 
@@ -123,6 +124,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Audit defensive DNA/RNA screening invariants on benign synthetic reporter oligos.",
     )
     psa.add_argument("--json", action="store_true", help="Emit JSON output.")
+
+    psv = sub.add_parser(
+        "surveillance-audit",
+        help="Audit pathogen metagenomic surveillance invariants on benign synthetic controls.",
+    )
+    psv.add_argument("--json", action="store_true", help="Emit JSON output.")
     return parser
 
 
@@ -206,6 +213,23 @@ def main(argv: list[str] | None = None) -> int:
                 )
             lines.append(
                 f"| naive_screener_caught | {len(report['naive_caught_invariants'])}/{report['naive_total_invariants']} | "
+                f"{', '.join(report['naive_caught_invariants'])} |"
+            )
+            print("\n".join(lines))
+        return 0 if report["hardened_passed"] else 1
+
+    if args.command == "surveillance-audit":
+        report = run_surveillance_self_check()
+        if args.json:
+            print(json.dumps(report, indent=2))
+        else:
+            lines = ["| Invariant | Status | Detail |", "|---|---|---|"]
+            for inv in report["hardened"]["invariants"]:
+                lines.append(
+                    f"| {inv['invariant']} | {'PASS' if inv['passed'] else 'FAIL'} | {inv['detail']} |"
+                )
+            lines.append(
+                f"| naive_mgs_caught | {len(report['naive_caught_invariants'])}/{report['naive_total_invariants']} | "
                 f"{', '.join(report['naive_caught_invariants'])} |"
             )
             print("\n".join(lines))

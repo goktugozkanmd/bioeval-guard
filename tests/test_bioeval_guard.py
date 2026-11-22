@@ -19,11 +19,13 @@ from bioeval_guard.grader_audit import (
     audit_numeric_string_verifier,
     audit_safety_judge_callable,
     audit_selective_precision_metric,
+    audit_unparseable_judge_nan_handling,
     case_safe_judge_label,
     hardened_mcq_option_grader,
     nan_safe_selective_precision,
     parse_tagged_answer_strict,
     run_reference_self_check,
+    unparseable_safe_nan_judge_score,
 )
 from bioeval_guard.hygiene import (
     AuditItem,
@@ -46,6 +48,13 @@ from bioeval_guard.inspect_tasks import (
     compute_nan_safe_precision_and_coverage,
     filter_clean_lab_bench_records,
     nan_safe_precision_metric,
+)
+from bioeval_guard.metagenomic_surveillance_audit import (
+    SYNTHETIC_HOST_DECOY_KMER,
+    SYNTHETIC_VECTOR_TARGET_KMER,
+    DefensiveMetagenomicScreener,
+    audit_metagenomic_surveillance_pipeline,
+    run_surveillance_self_check,
 )
 from bioeval_guard.sequence_screening_audit import (
     SYNTHETIC_CONTROL_KMER,
@@ -512,13 +521,15 @@ def test_inspect_tasks_helpers_and_self_check_cli(
 
     self_rep = run_reference_self_check()
     assert self_rep["hardened_all_passed"] is True
-    assert self_rep["vulnerable_caught"] == self_rep["vulnerable_total"] == 4
+    assert self_rep["vulnerable_caught"] == self_rep["vulnerable_total"] == 5
 
     assert main(["self-check", "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["hardened_all_passed"] is True
     assert main(["self-check"]) == 0
-    assert "| mcq_option_text_grader |" in capsys.readouterr().out
+    out_md = capsys.readouterr().out
+    assert "| mcq_option_text_grader |" in out_md
+    assert "| unparseable_judge_nan_handling |" in out_md
 
 
 def test_mcq_option_text_grader_auditor_catches_end_letter_inversion() -> None:
@@ -635,3 +646,66 @@ def test_clustered_benchmark_se_invariants_and_cli(
     assert cli_payload["n_clusters"] == 6
     assert main(["cluster-audit", str(jpath)]) == 0
     assert "| 30 | 6 |" in capsys.readouterr().out
+
+
+def test_unparseable_judge_nan_auditor_and_helper() -> None:
+    import math
+
+    assert math.isnan(unparseable_safe_nan_judge_score(""))
+    assert math.isnan(unparseable_safe_nan_judge_score('{"verdict": '))
+    assert math.isnan(
+        unparseable_safe_nan_judge_score("I cannot answer due to policy.")
+    )
+    assert unparseable_safe_nan_judge_score('```json\n{"verdict": "yes"}\n```') == 1.0
+    assert unparseable_safe_nan_judge_score('{"verdict": "no"}') == 0.0
+
+    bad = audit_unparseable_judge_nan_handling(
+        lambda s: 1.0 if '"verdict": "yes"' in s.lower() else 0.0
+    )
+    assert bad["passed"] is False
+    assert len(bad["failures"]) == 4
+
+    good = audit_unparseable_judge_nan_handling(unparseable_safe_nan_judge_score)
+    assert good["passed"] is True
+    assert good["probes_run"] == 6
+
+
+def test_metagenomic_surveillance_invariants_and_cli(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    screener = DefensiveMetagenomicScreener()
+    rep = audit_metagenomic_surveillance_pipeline(screener)
+    assert rep["passed"] is True
+    assert rep["passed_count"] == rep["total_invariants"] == 6
+
+    # Direct checks for non-host overhang threshold and LCA separation
+    short_chimera = SYNTHETIC_HOST_DECOY_KMER + SYNTHETIC_VECTOR_TARGET_KMER[:20]
+    assert screener.screen_host_depleted_read(short_chimera) is False
+    assert (
+        screener.screen_host_depleted_read(
+            SYNTHETIC_HOST_DECOY_KMER + "AA" + SYNTHETIC_VECTOR_TARGET_KMER
+        )
+        is True
+    )
+    with pytest.raises(ValueError, match="spike_in_reads"):
+        screener.normalize_spike_in_abundance(10, 0)
+
+    self_surv = run_surveillance_self_check()
+    assert self_surv["hardened_passed"] is True
+    assert len(self_surv["naive_caught_invariants"]) == 6
+    assert "host_chimera_junction_retention" in self_surv["naive_caught_invariants"]
+    assert (
+        "samplesheet_missing_file_fail_closed" in self_surv["naive_caught_invariants"]
+    )
+    assert (
+        "spike_in_compositional_closure_invariance"
+        in self_surv["naive_caught_invariants"]
+    )
+
+    assert main(["surveillance-audit", "--json"]) == 0
+    cli_json = json.loads(capsys.readouterr().out)
+    assert cli_json["hardened_passed"] is True
+    assert main(["surveillance-audit"]) == 0
+    out_md = capsys.readouterr().out
+    assert "| host_chimera_junction_retention | PASS |" in out_md
+    assert "| paired_mate_strand_concordance | PASS |" in out_md
