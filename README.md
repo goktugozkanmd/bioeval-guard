@@ -120,6 +120,16 @@ bioeval-guard distance-audit
 - **6-Invariant Cumulative Evolutionary Distance & Antigenic-Advance Auditor** (`bioeval_guard.evolutionary_distance_audit` & `DefensiveEvolutionaryDistanceAuditor`): audits reversion-saturation recovery via pre-order path integration (`augur#2035`), homoplasy vs. synapomorphy branch-event separation, ambiguous/dropout character exclusion (`N`/`?`), contiguous indel consolidation, directed asymmetric antigenic map invariance with negative-weight rejection, and fail-closed validation on missing ancestral sequences or cyclic topologies using strictly benign synthetic neutral barcodes.
 - **Header-Agnostic Rubric Scorer Auditor** (`header_agnostic_rubric_scorer`, `audit_rubric_header_format_invariance`): prevents Markdown-heading judge outputs (`## Scores`, `#Scores`, headerless `1.b`/`2.b`/`3.b`) from failing silently as `grader_failed` (`strong_reject` `#2916`) while isolating reasoning mentions and rejecting contradictory duplicate scores or out-of-range values.
 
+### v1.1.0 Generative De Novo Bio-Design Screening & Agentic Verifier Integrity Auditors
+
+```bash
+bioeval-guard design-screen-audit
+bioeval-guard self-check
+```
+
+- **6-Invariant Generative De Novo Bio-Design Screening Auditor** (`bioeval_guard.de_novo_design_screening_audit` & `DefensiveDesignScreener`): audits Gibson/overlap-extension reverse-complement junction reconstruction, Type IIS `BsaI`/`BsmBI` scarless Golden Gate overhang ligation, split-intein (`DnaE`) protein trans-splicing, 0%-DNA-15mer synonymous rare-codon back-translation, cross-frame `+1` programmed ribosomal frameshift indel bridging, and fail-closed `<mask>`/`<pad>` generative token rejection using strictly benign synthetic reporter tags (`Strep-II`/`SpyTag`).
+- **Agentic Verifier Confidence & Transcript Provenance Auditors** (`audit_verifier_confidence_fail_closed`, `fail_closed_verifier_gate`, `audit_agent_transcript_injection_resistance`, `provenance_safe_transcript_turn_filter`): enforces fail-closed review triggers when judge confidence is `None`, `NaN`, boolean, or out-of-range (`transect#90`), blocks self-authored `[assistant turn failed` turn-deletion exploits (`transect#87`), and neutralizes Unicode/LF/CRLF newline key injection in sub-agent metadata (`transect#89/#91`).
+
 ## Author & Contact
 
 - **Author:** Göktuğ Özkan, MD (`drozkan2@gmail.com`, ORCID: `0000-0002-5022-9124`)

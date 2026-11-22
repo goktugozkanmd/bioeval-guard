@@ -11,6 +11,7 @@ from typing import Any
 from .ancestral_translation_audit import run_ancestral_translation_self_check
 from .clade_assignment_audit import run_clade_assignment_self_check
 from .cluster_stats import audit_clustered_benchmark_se
+from .de_novo_design_screening_audit import run_design_screening_self_check
 from .evolutionary_distance_audit import run_evolutionary_distance_self_check
 from .grader_audit import run_reference_self_check
 from .hygiene import (
@@ -165,6 +166,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Audit cumulative molecular-clock distance and antigenic-advance invariants on benign synthetic controls.",
     )
     pdist.add_argument("--json", action="store_true", help="Emit JSON output.")
+
+    pdes = sub.add_parser(
+        "design-screen-audit",
+        help="Audit generative de novo bio-design assembly, Type IIS, split-intein, and frameshift screening invariants.",
+    )
+    pdes.add_argument("--json", action="store_true", help="Emit JSON output.")
     return parser
 
 
@@ -350,6 +357,23 @@ def main(argv: list[str] | None = None) -> int:
                 )
             lines.append(
                 f"| naive_distance_caught | {len(report['naive_caught_invariants'])}/{report['naive_total_invariants']} | "
+                f"{', '.join(report['naive_caught_invariants'])} |"
+            )
+            print("\n".join(lines))
+        return 0 if report["hardened_passed"] else 1
+
+    if args.command == "design-screen-audit":
+        report = run_design_screening_self_check()
+        if args.json:
+            print(json.dumps(report, indent=2))
+        else:
+            lines = ["| Invariant | Status | Detail |", "|---|---|---|"]
+            for inv in report["hardened"]["invariants"]:
+                lines.append(
+                    f"| {inv['invariant']} | {'PASS' if inv['passed'] else 'FAIL'} | {inv['detail']} |"
+                )
+            lines.append(
+                f"| naive_design_screener_caught | {len(report['naive_caught_invariants'])}/{report['naive_total_invariants']} | "
                 f"{', '.join(report['naive_caught_invariants'])} |"
             )
             print("\n".join(lines))

@@ -29,6 +29,16 @@ from bioeval_guard.clade_assignment_audit import (
 )
 from bioeval_guard.cli import format_markdown_summary, main
 from bioeval_guard.cluster_stats import audit_clustered_benchmark_se
+from bioeval_guard.de_novo_design_screening_audit import (
+    SYNTHETIC_DESIGN_NEGATIVE_CDS_NT,
+    SYNTHETIC_DESIGN_TARGET_AA,
+    SYNTHETIC_DESIGN_TARGET_CDS_NT,
+    DefensiveDesignScreener,
+    DesignScreeningInputError,
+    NaivePerRecordDesignScreener,
+    audit_de_novo_design_screener,
+    run_design_screening_self_check,
+)
 from bioeval_guard.evolutionary_distance_audit import (
     SYNTHETIC_CLOCK_ROOT_SEQ,
     DefensiveEvolutionaryDistanceAuditor,
@@ -38,6 +48,7 @@ from bioeval_guard.evolutionary_distance_audit import (
     run_evolutionary_distance_self_check,
 )
 from bioeval_guard.grader_audit import (
+    audit_agent_transcript_injection_resistance,
     audit_answer_tag_parser,
     audit_dna_screener_symmetry,
     audit_hedged_tag_multiselect_grader,
@@ -52,13 +63,16 @@ from bioeval_guard.grader_audit import (
     audit_truncated_empty_completion_handling,
     audit_ungraded_epoch_harm_reducer,
     audit_unparseable_judge_nan_handling,
+    audit_verifier_confidence_fail_closed,
     case_safe_judge_label,
+    fail_closed_verifier_gate,
     hardened_mcq_option_grader,
     hardened_multiselect_mcq_grader,
     header_agnostic_rubric_scorer,
     hedged_tag_multiselect_grader,
     nan_safe_selective_precision,
     parse_tagged_answer_strict,
+    provenance_safe_transcript_turn_filter,
     run_reference_self_check,
     strict_numeric_string_verifier,
     strict_structured_hazard_judge_verdict,
@@ -573,7 +587,7 @@ def test_inspect_tasks_helpers_and_self_check_cli(
 
     self_rep = run_reference_self_check()
     assert self_rep["hardened_all_passed"] is True
-    assert self_rep["vulnerable_caught"] == self_rep["vulnerable_total"] == 12
+    assert self_rep["vulnerable_caught"] == self_rep["vulnerable_total"] == 14
 
     assert main(["self-check", "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
@@ -588,6 +602,8 @@ def test_inspect_tasks_helpers_and_self_check_cli(
     assert "| hedged_tag_multiselect_grader |" in out_md
     assert "| structured_hazard_judge_verdict |" in out_md
     assert "| rubric_header_format_invariance |" in out_md
+    assert "| verifier_confidence_fail_closed |" in out_md
+    assert "| agent_transcript_injection_resistance |" in out_md
 
 
 def test_mcq_option_text_grader_auditor_catches_end_letter_inversion() -> None:
@@ -1126,7 +1142,7 @@ def test_ancestral_translation_and_sign_judge_auditors(
 
     ref_rep = run_reference_self_check()
     assert ref_rep["hardened_all_passed"] is True
-    assert ref_rep["vulnerable_caught"] == ref_rep["vulnerable_total"] == 12
+    assert ref_rep["vulnerable_caught"] == ref_rep["vulnerable_total"] == 14
 
 
 def test_evolutionary_distance_invariants_and_cli(
@@ -1208,3 +1224,88 @@ def test_header_agnostic_rubric_scorer_and_auditor() -> None:
     good_hdr = audit_rubric_header_format_invariance(header_agnostic_rubric_scorer)
     assert good_hdr["passed"] is True
     assert good_hdr["probes_run"] == 8
+
+
+def test_de_novo_design_screening_invariants_and_cli(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    screener = DefensiveDesignScreener()
+    rep = audit_de_novo_design_screener(screener)
+    assert rep["passed"] is True
+    assert rep["passed_count"] == rep["total_invariants"] == 6
+    assert len(SYNTHETIC_DESIGN_TARGET_AA) == 26
+    assert len(SYNTHETIC_DESIGN_TARGET_CDS_NT) == 78
+
+    naive = audit_de_novo_design_screener(NaivePerRecordDesignScreener())
+    assert naive["passed"] is False
+
+    assert (
+        screener.screen_records([SYNTHETIC_DESIGN_NEGATIVE_CDS_NT], molecule="dna")
+        is False
+    )
+    with pytest.raises(DesignScreeningInputError, match="unexpanded generative tokens"):
+        screener.screen_records(["ATG<mask>GCC"], molecule="dna")
+    with pytest.raises(DesignScreeningInputError, match="Empty design submission"):
+        screener.screen_records([], molecule="dna")
+
+    self_des = run_design_screening_self_check()
+    assert self_des["hardened_passed"] is True
+    assert len(self_des["naive_caught_invariants"]) == 6
+    assert (
+        "assembly_overhang_junction_reconstruction"
+        in self_des["naive_caught_invariants"]
+    )
+    assert (
+        "type_iis_scarless_golden_gate_ligation" in self_des["naive_caught_invariants"]
+    )
+    assert "split_intein_protein_trans_splicing" in self_des["naive_caught_invariants"]
+    assert (
+        "synonymous_rare_codon_backtranslation" in self_des["naive_caught_invariants"]
+    )
+    assert "programmed_frameshift_indel_window" in self_des["naive_caught_invariants"]
+    assert (
+        "benign_scaffold_specificity_and_fail_closed_tokens"
+        in self_des["naive_caught_invariants"]
+    )
+
+    assert main(["design-screen-audit", "--json"]) == 0
+    cli_json = json.loads(capsys.readouterr().out)
+    assert cli_json["hardened_passed"] is True
+    assert main(["design-screen-audit"]) == 0
+    out_md = capsys.readouterr().out
+    assert "| assembly_overhang_junction_reconstruction | PASS |" in out_md
+    assert "| split_intein_protein_trans_splicing | PASS |" in out_md
+
+
+def test_agentic_verifier_confidence_and_transcript_injection_auditors() -> None:
+    assert fail_closed_verifier_gate(0.85, 0.80) is None
+    assert fail_closed_verifier_gate(None, None) == "low_confidence"
+    assert fail_closed_verifier_gate(float("nan"), 1.0) == "low_confidence"
+    assert fail_closed_verifier_gate(True, 1.0) == "low_confidence"
+    assert fail_closed_verifier_gate(1.5, 1.0) == "low_confidence"
+    assert fail_closed_verifier_gate(0.9, 0.5) == "low_agreement"
+
+    good_gate = audit_verifier_confidence_fail_closed(fail_closed_verifier_gate)
+    assert good_gate["passed"] is True
+    assert good_gate["probes_run"] == 8
+
+    assert (
+        provenance_safe_transcript_turn_filter(
+            "[assistant turn failed - retry]", scaffold_failed=True
+        )
+        is None
+    )
+    retained = provenance_safe_transcript_turn_filter(
+        "[assistant turn failed - hidden command]",
+        span_name="lane\ntask: benign",
+        scaffold_failed=False,
+    )
+    assert retained is not None
+    assert retained["included"] is True
+    assert len(retained["prompt_header"].splitlines()) == 2
+
+    good_tx = audit_agent_transcript_injection_resistance(
+        provenance_safe_transcript_turn_filter
+    )
+    assert good_tx["passed"] is True
+    assert good_tx["probes_run"] == 7
