@@ -19,12 +19,14 @@ from bioeval_guard.grader_audit import (
     audit_numeric_string_verifier,
     audit_safety_judge_callable,
     audit_selective_precision_metric,
+    audit_truncated_empty_completion_handling,
     audit_unparseable_judge_nan_handling,
     case_safe_judge_label,
     hardened_mcq_option_grader,
     nan_safe_selective_precision,
     parse_tagged_answer_strict,
     run_reference_self_check,
+    truncation_safe_answer_gate,
     unparseable_safe_nan_judge_score,
 )
 from bioeval_guard.hygiene import (
@@ -55,6 +57,12 @@ from bioeval_guard.metagenomic_surveillance_audit import (
     DefensiveMetagenomicScreener,
     audit_metagenomic_surveillance_pipeline,
     run_surveillance_self_check,
+)
+from bioeval_guard.phylodynamic_surveillance_audit import (
+    SYNTHETIC_HOUSEKEEPING_REF,
+    DefensivePhylodynamicScreener,
+    audit_phylodynamic_surveillance_pipeline,
+    run_phylodynamic_self_check,
 )
 from bioeval_guard.sequence_screening_audit import (
     SYNTHETIC_CONTROL_KMER,
@@ -521,7 +529,7 @@ def test_inspect_tasks_helpers_and_self_check_cli(
 
     self_rep = run_reference_self_check()
     assert self_rep["hardened_all_passed"] is True
-    assert self_rep["vulnerable_caught"] == self_rep["vulnerable_total"] == 5
+    assert self_rep["vulnerable_caught"] == self_rep["vulnerable_total"] == 6
 
     assert main(["self-check", "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
@@ -530,6 +538,7 @@ def test_inspect_tasks_helpers_and_self_check_cli(
     out_md = capsys.readouterr().out
     assert "| mcq_option_text_grader |" in out_md
     assert "| unparseable_judge_nan_handling |" in out_md
+    assert "| truncated_empty_completion_handling |" in out_md
 
 
 def test_mcq_option_text_grader_auditor_catches_end_letter_inversion() -> None:
@@ -709,3 +718,79 @@ def test_metagenomic_surveillance_invariants_and_cli(
     out_md = capsys.readouterr().out
     assert "| host_chimera_junction_retention | PASS |" in out_md
     assert "| paired_mate_strand_concordance | PASS |" in out_md
+
+
+def test_truncated_empty_completion_gate_and_auditor() -> None:
+    assert truncation_safe_answer_gate("", None) is None
+    assert (
+        truncation_safe_answer_gate("<think>long reasoning...</think>", "max_tokens")
+        is None
+    )
+    assert (
+        truncation_safe_answer_gate("<think>unclosed reasoning", "max_tokens") is None
+    )
+    assert (
+        truncation_safe_answer_gate("<think>step 1</think>   \n\t ", "length") is None
+    )
+    assert (
+        truncation_safe_answer_gate("<think>check</think>Final answer", "stop")
+        == "Final answer"
+    )
+    assert truncation_safe_answer_gate("Final answer", "stop") == "Final answer"
+
+    bad = audit_truncated_empty_completion_handling(lambda s, _r=None: s or "")
+    assert bad["passed"] is False
+    failed = {f["probe"] for f in bad["failures"]}
+    assert "empty_string" in failed
+    assert "think_only_max_tokens" in failed
+    assert "whitespace_after_think" in failed
+    assert "valid_answer_after_think" in failed
+
+    good = audit_truncated_empty_completion_handling(truncation_safe_answer_gate)
+    assert good["passed"] is True
+    assert good["probes_run"] == 5
+
+
+def test_phylodynamic_surveillance_invariants_and_cli(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    screener = DefensivePhylodynamicScreener()
+    rep = audit_phylodynamic_surveillance_pipeline(screener)
+    assert rep["passed"] is True
+    assert rep["passed_count"] == rep["total_invariants"] == 6
+
+    # Direct checks for benign housekeeping template, bounds, codon frame, polytomy, HT weights
+    assert len(SYNTHETIC_HOUSEKEEPING_REF) == 60
+    assert screener.parse_collection_date_bounds("2024-02") == (
+        "2024-02-01",
+        "2024-02-29",
+    )
+    assert screener.translate_codon_aligned("ATG---ACNGGNATNTGG") == "M-TGXW"
+    with pytest.raises(ValueError, match="mismatch"):
+        screener.validate_index_parity(["S1", "S2"], ["S1"], allow_partial=False)
+    partial = screener.validate_index_parity(["S1", "S2"], ["S1"], allow_partial=True)
+    assert partial["missing_in_metadata"] == ["S2"]
+    assert screener.infer_directed_transmission(0.0) == {
+        "directed_transmission": False,
+        "status": "unresolved_polytomy",
+    }
+
+    self_phylo = run_phylodynamic_self_check()
+    assert self_phylo["hardened_passed"] is True
+    assert len(self_phylo["naive_caught_invariants"]) == 6
+    assert "sequence_metadata_index_parity" in self_phylo["naive_caught_invariants"]
+    assert "ambiguous_iupac_mutation_masking" in self_phylo["naive_caught_invariants"]
+    assert "incomplete_collection_date_bounds" in self_phylo["naive_caught_invariants"]
+    assert "frame_preserving_codon_translation" in self_phylo["naive_caught_invariants"]
+    assert "polytomy_transmission_tie_guard" in self_phylo["naive_caught_invariants"]
+    assert (
+        "horvitz_thompson_sampling_depletion" in self_phylo["naive_caught_invariants"]
+    )
+
+    assert main(["phylo-audit", "--json"]) == 0
+    cli_json = json.loads(capsys.readouterr().out)
+    assert cli_json["hardened_passed"] is True
+    assert main(["phylo-audit"]) == 0
+    out_md = capsys.readouterr().out
+    assert "| sequence_metadata_index_parity | PASS |" in out_md
+    assert "| horvitz_thompson_sampling_depletion | PASS |" in out_md

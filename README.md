@@ -69,6 +69,15 @@ bioeval-guard surveillance-audit
 - **6-Invariant Metagenomic Surveillance Auditor** (`bioeval_guard.metagenomic_surveillance_audit` & `DefensiveMetagenomicScreener`): audits host-chimera junction retention (`>=31 bp` non-host overhangs), strict zero-padded multiplex barcode canonicalization, fail-closed sample-sheet file existence checks, LCA alert-candidate preservation, spike-in compositional invariance under `100x` flora bloom, and paired-mate strand symmetry on strictly benign synthetic controls.
 - **Unparseable Judge NaN Auditor** (`audit_unparseable_judge_nan_handling` & `unparseable_safe_nan_judge_score`): catches empty/content-filtered/malformed judge completions silently collapsing to `0.0` instead of `NaN`.
 
+### v0.6.0 Phylodynamic Surveillance & Truncated-Completion Gate Auditors
+
+```bash
+bioeval-guard phylo-audit
+```
+
+- **6-Invariant Phylodynamic Surveillance Auditor** (`bioeval_guard.phylodynamic_surveillance_audit` & `DefensivePhylodynamicScreener`): audits sequence/metadata index parity, IUPAC/dropout mutation masking, incomplete collection-date uncertainty bounds, frame-preserving codon translation across deletions and 4-fold ambiguous codons, zero-length polytomy tie guarding, and Horvitz-Thompson sampling-depletion invariance on strictly benign synthetic housekeeping templates.
+- **Truncated / Empty Completion Gate Auditor** (`audit_truncated_empty_completion_handling` & `truncation_safe_answer_gate`): strips `<think>`/`<reasoning>` traces and rejects `max_tokens`/`length`/`content_filter` empty outputs instead of passing `""` to downstream safety judges.
+
 ## Author & Contact
 
 - **Author:** Göktuğ Özkan, MD (`drozkan2@gmail.com`, ORCID: `0000-0002-5022-9124`)
