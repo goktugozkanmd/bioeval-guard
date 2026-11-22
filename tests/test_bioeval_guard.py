@@ -601,7 +601,8 @@ def test_inspect_tasks_helpers_and_self_check_cli(
 
     self_rep = run_reference_self_check()
     assert self_rep["hardened_all_passed"] is True
-    assert self_rep["vulnerable_caught"] == self_rep["vulnerable_total"] == 16
+    assert self_rep["vulnerable_caught"] == self_rep["vulnerable_total"]
+    assert self_rep["vulnerable_total"] >= 16
 
     assert main(["self-check", "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
@@ -1156,7 +1157,8 @@ def test_ancestral_translation_and_sign_judge_auditors(
 
     ref_rep = run_reference_self_check()
     assert ref_rep["hardened_all_passed"] is True
-    assert ref_rep["vulnerable_caught"] == ref_rep["vulnerable_total"] == 16
+    assert ref_rep["vulnerable_caught"] == ref_rep["vulnerable_total"]
+    assert ref_rep["vulnerable_total"] >= 16
 
 
 def test_evolutionary_distance_invariants_and_cli(
@@ -1426,4 +1428,5 @@ def test_honesty_error_isolation_and_empty_tool_args_auditors() -> None:
 
     ref_rep = run_reference_self_check()
     assert ref_rep["hardened_all_passed"] is True
-    assert ref_rep["vulnerable_caught"] == ref_rep["vulnerable_total"] == 16
+    assert ref_rep["vulnerable_caught"] == ref_rep["vulnerable_total"]
+    assert ref_rep["vulnerable_total"] >= 16

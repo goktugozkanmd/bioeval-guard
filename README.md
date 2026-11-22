@@ -140,6 +140,16 @@ bioeval-guard self-check
 - **6-Invariant Tiled-Amplicon & Wastewater Surveillance Auditor** (`bioeval_guard.amplicon_surveillance_audit` & `DefensiveAmpliconSurveillanceAuditor`): audits 5'/3' primer-binding-site clipping prior to variant calling, symmetrical short-insert 3' read-through trimming across strands, duplicate reference deduplication parity (`augur#1892`), low-depth site masking (`N`/`NaN` without `0.0` wild-type coercion), non-negative simplex wastewater lineage deconvolution with explicit unexplained cryptic residual tracking, and negative-template control (NTC) contamination fail-closed gating on strictly benign synthetic GFP-derived reporter sequences.
 - **Error-Isolated Honesty & Agentic Empty-Tool Gate Auditors** (`error_isolated_honesty_score`, `audit_honesty_error_denominator_isolation`, `non_empty_tool_call_semantic_gate`, `audit_empty_tool_args_judge_gate`): prevents unparseable/whitespace-only judge outputs from crashing or inflating honesty denominators (`mask` `#2896`/`#2623`) and blocks uncalled `"{}"` or schema-mismatched tool arguments from reaching LLM semantic judges (`agentharm` `#2895`/`#2893`).
 
+### v1.3.0 Pathogen Read-Dedup / Index-Hopping & Last-Line Verdict / Boolean Judge Auditors
+
+```bash
+bioeval-guard dedup-audit
+bioeval-guard self-check
+```
+
+- **6-Invariant Read Deduplication & Index-Hopping Auditor** (`bioeval_guard.read_dedup_hopping_audit` & `DefensiveReadDedupAuditor`): audits paired-end reverse-complement orientation symmetry, UMI + 5' coordinate disentanglement (`Hamming >= 2` kept vs `<= 1` error collapse), probability-space Phred quality consensus (`p = 10**(-Q/10)`, `nao-dedup#6`), patterned-flowcell single-shared-index hopping quarantine, salt-hashed `(kmer_hash, pos_bin)` minimizers against homopolymer bucket saturation (`nao-dedup#9/#36/#37`), and fail-closed mate-pair/quality-length validation on strictly benign synthetic MS2/ribosomal spike-in tags.
+- **Last-Line Research Verdict & Strict Boolean Autopatch Auditors** (`last_line_verdict_research_scorer`, `audit_last_line_research_verdict_parser`, `strict_boolean_autopatch_scorer`, `audit_string_boolean_judge_coercion`): anchors `VERDICT: <decimal>` to the last non-empty unquoted line with `None`/unscored parse-failure isolation (`frontierscience#2848`) and blocks `"false"` -> `bool("false") == True` coercion in structured boolean judges (`cyberseceval_4#2934`).
+
 ## Author & Contact
 
 - **Author:** Göktuğ Özkan, MD (`drozkan2@gmail.com`, ORCID: `0000-0002-5022-9124`)
