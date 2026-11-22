@@ -1,5 +1,14 @@
 """bioeval_guard: Deterministic biosecurity and AIxBio benchmark integrity auditor."""
 
+from .ancestral_translation_audit import (
+    SYNTHETIC_REPORTER_CDS_NT,
+    SYNTHETIC_REPORTER_PROTEIN_AA,
+    DefensiveTranslationAlignmentScreener,
+    NaiveTranslationAlignmentLoader,
+    TranslationAlignmentError,
+    audit_ancestral_translation_pipeline,
+    run_ancestral_translation_self_check,
+)
 from .clade_assignment_audit import (
     SYNTHETIC_CLADE_ROOT_SEQ,
     CladeDefinitionError,
@@ -13,6 +22,7 @@ from .grader_audit import (
     audit_answer_tag_parser,
     audit_dna_screener_symmetry,
     audit_hedged_tag_multiselect_grader,
+    audit_judge_parse_error_isolation,
     audit_mcq_option_text_grader,
     audit_multiselect_mcq_grader,
     audit_numeric_string_verifier,
@@ -29,10 +39,12 @@ from .grader_audit import (
     nan_safe_selective_precision,
     parse_tagged_answer_strict,
     run_reference_self_check,
+    strict_numeric_string_verifier,
     strict_structured_hazard_judge_verdict,
     truncation_safe_answer_gate,
     ungraded_safe_epoch_harm_reducer,
     unparseable_safe_nan_judge_score,
+    unscored_on_unparseable_judge_verdict,
 )
 from .hygiene import (
     AuditItem,
@@ -102,8 +114,10 @@ __all__ = [
     "SYNTHETIC_NEGATIVE_OLIGO",
     "SYNTHETIC_NEGATIVE_PEPTIDE",
     "SYNTHETIC_NEGATIVE_READ",
+    "SYNTHETIC_REPORTER_CDS_NT",
     "SYNTHETIC_REPORTER_MOTIF",
     "SYNTHETIC_REPORTER_PEPTIDE",
+    "SYNTHETIC_REPORTER_PROTEIN_AA",
     "SYNTHETIC_VECTOR_TARGET_KMER",
     "AuditItem",
     "CladeDefinitionError",
@@ -112,12 +126,17 @@ __all__ = [
     "DefensiveMetagenomicScreener",
     "DefensivePhylodynamicScreener",
     "DefensiveProteinScreener",
+    "DefensiveTranslationAlignmentScreener",
     "MissingCladeError",
+    "NaiveTranslationAlignmentLoader",
+    "TranslationAlignmentError",
+    "audit_ancestral_translation_pipeline",
     "audit_answer_tag_parser",
     "audit_clade_assignment_pipeline",
     "audit_clustered_benchmark_se",
     "audit_dna_screener_symmetry",
     "audit_hedged_tag_multiselect_grader",
+    "audit_judge_parse_error_isolation",
     "audit_mcq_option_text_grader",
     "audit_metagenomic_surveillance_pipeline",
     "audit_multiselect_mcq_grader",
@@ -151,6 +170,7 @@ __all__ = [
     "parse_tagged_answer_strict",
     "question_blind_centroid_baseline",
     "reverse_complement_dna",
+    "run_ancestral_translation_self_check",
     "run_clade_assignment_self_check",
     "run_phylodynamic_self_check",
     "run_protein_screening_self_check",
@@ -158,10 +178,12 @@ __all__ = [
     "run_screening_self_check",
     "run_surveillance_self_check",
     "sanitize_mcq_dataset",
+    "strict_numeric_string_verifier",
     "strict_structured_hazard_judge_verdict",
     "truncation_safe_answer_gate",
     "ungraded_safe_epoch_harm_reducer",
     "unparseable_safe_nan_judge_score",
+    "unscored_on_unparseable_judge_verdict",
 ]
 
-__version__ = "0.8.0"
+__version__ = "0.9.0"

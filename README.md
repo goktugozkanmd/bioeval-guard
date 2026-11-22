@@ -30,8 +30,14 @@ bioeval-guard summary datasets/wmdp_bio.parquet datasets/lab_bench_SeqQA.parquet
 ### Inspect AI Pre-Filter & Register-Ready Usage
 
 ```python
-from bioeval_guard.inspect_adapter import sanitize_mcq_dataset, question_blind_centroid_baseline
-from bioeval_guard.inspect_tasks import filter_clean_lab_bench_records, nan_safe_precision_metric
+from bioeval_guard.inspect_adapter import (
+    sanitize_mcq_dataset,
+    question_blind_centroid_baseline,
+)
+from bioeval_guard.inspect_tasks import (
+    filter_clean_lab_bench_records,
+    nan_safe_precision_metric,
+)
 
 clean_records, hygiene_report = sanitize_mcq_dataset(records, dataset_name="SeqQA")
 ```
@@ -95,6 +101,15 @@ bioeval-guard clade-audit
 
 - **6-Invariant Pathogen Clade Surveillance Auditor** (`bioeval_guard.clade_assignment_audit` & `DefensiveCladeAssigner`): audits fail-closed `--error-on-missing-clade` detection (`augur#1910`), acyclic single-parent inheritance DAG validation, specificity-ordered subclade assignment independent of TSV row order, strict 1-based to 0-based coordinate bounds, preorder branch-reversion tracking, and mosaic/recombinant dual-lineage flagging on strictly benign synthetic housekeeping templates.
 - **Hedged-Tag & Structured Hazard Judge Auditors** (`audit_hedged_tag_multiselect_grader`, `hedged_tag_multiselect_grader`, `audit_structured_hazard_judge_verdict`, `strict_structured_hazard_judge_verdict`): blocks `[ANSWER]A, though C...[/ANSWER]` tail-truncation gaming (`MaCBench` `#2918`) and catches case-sensitive `"Unsafe"` fallthrough and non-dict JSON crashes (`SOSBench` `#2884`).
+
+### v0.9.0 Ancestral Translation Alignment & Sign/Decimal / Judge-Parse Auditors
+
+```bash
+bioeval-guard translation-audit
+```
+
+- **6-Invariant Ancestral Translation Alignment Auditor** (`bioeval_guard.ancestral_translation_audit` & `DefensiveTranslationAlignmentScreener`): audits modal-length + outlier ID diagnostics (`augur#1919`), duplicate taxon ID fail-closed rejection, CDS-to-protein codon-length parity, nucleotide-passed-as-protein ACGTN collision guarding, internal premature `*` stop-codon preservation, and nucleotide-codon vs AA mutation cross-checking on strictly benign synthetic reporter sequences.
+- **Sign/Decimal Numeric Verifier & Unparseable Judge Isolation Auditors** (`strict_numeric_string_verifier`, `audit_numeric_string_verifier`, `unscored_on_unparseable_judge_verdict`, `audit_judge_parse_error_isolation`): enforces negative sign and decimal preservation (`BixBench` `#47`) while isolating malformed/refused judge completions as `NaN` rather than `0.0` model failures (`cyberseceval_4` `#2934`).
 
 ## Author & Contact
 

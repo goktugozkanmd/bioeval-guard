@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from .ancestral_translation_audit import run_ancestral_translation_self_check
 from .clade_assignment_audit import run_clade_assignment_self_check
 from .cluster_stats import audit_clustered_benchmark_se
 from .grader_audit import run_reference_self_check
@@ -151,6 +152,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Audit pathogen clade surveillance and lineage-assignment invariants on benign synthetic controls.",
     )
     pcl.add_argument("--json", action="store_true", help="Emit JSON output.")
+
+    ptr = sub.add_parser(
+        "translation-audit",
+        help="Audit ancestral translation alignment and codon-frame invariants on benign synthetic controls.",
+    )
+    ptr.add_argument("--json", action="store_true", help="Emit JSON output.")
     return parser
 
 
@@ -302,6 +309,23 @@ def main(argv: list[str] | None = None) -> int:
                 )
             lines.append(
                 f"| naive_clade_caught | {len(report['naive_caught_invariants'])}/{report['naive_total_invariants']} | "
+                f"{', '.join(report['naive_caught_invariants'])} |"
+            )
+            print("\n".join(lines))
+        return 0 if report["hardened_passed"] else 1
+
+    if args.command == "translation-audit":
+        report = run_ancestral_translation_self_check()
+        if args.json:
+            print(json.dumps(report, indent=2))
+        else:
+            lines = ["| Invariant | Status | Detail |", "|---|---|---|"]
+            for inv in report["hardened"]["invariants"]:
+                lines.append(
+                    f"| {inv['invariant']} | {'PASS' if inv['passed'] else 'FAIL'} | {inv['detail']} |"
+                )
+            lines.append(
+                f"| naive_translation_caught | {len(report['naive_caught_invariants'])}/{report['naive_total_invariants']} | "
                 f"{', '.join(report['naive_caught_invariants'])} |"
             )
             print("\n".join(lines))
