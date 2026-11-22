@@ -87,6 +87,15 @@ bioeval-guard protein-audit
 - **6-Invariant Protein & 6-Frame Codon Screening Auditor** (`bioeval_guard.protein_screening_audit` & `DefensiveProteinScreener`): audits 3-letter IUPAC dealiasing, 6-frame synonymous nucleotide back-translation coverage, PTM/modified-residue normalization (`(SEP)`/`(TPO)`/`(PTR)`), circular and split fusion boundary continuity, IUPAC `B/Z/J/X` ambiguity expansion with fail-closed excessive-ambiguity guards, and `<5%` chimeric scaffold localization on strictly benign synthetic His6/Strep-II linker peptides.
 - **Multi-Select MCQ & Multi-Epoch Harm Auditors** (`audit_multiselect_mcq_grader`, `hardened_multiselect_mcq_grader`, `audit_ungraded_epoch_harm_reducer`, `ungraded_safe_epoch_harm_reducer`): prevents delimiter/order penalties on multi-select items (`ChemBench` `#2586`) and guards multi-epoch harm reducers against coercing abstained/ungraded epochs to `0.0` (`FORTRESS` `#2642`).
 
+### v0.8.0 Pathogen Clade Surveillance & Structured Hazard / Hedged-Tag Auditors
+
+```bash
+bioeval-guard clade-audit
+```
+
+- **6-Invariant Pathogen Clade Surveillance Auditor** (`bioeval_guard.clade_assignment_audit` & `DefensiveCladeAssigner`): audits fail-closed `--error-on-missing-clade` detection (`augur#1910`), acyclic single-parent inheritance DAG validation, specificity-ordered subclade assignment independent of TSV row order, strict 1-based to 0-based coordinate bounds, preorder branch-reversion tracking, and mosaic/recombinant dual-lineage flagging on strictly benign synthetic housekeeping templates.
+- **Hedged-Tag & Structured Hazard Judge Auditors** (`audit_hedged_tag_multiselect_grader`, `hedged_tag_multiselect_grader`, `audit_structured_hazard_judge_verdict`, `strict_structured_hazard_judge_verdict`): blocks `[ANSWER]A, though C...[/ANSWER]` tail-truncation gaming (`MaCBench` `#2918`) and catches case-sensitive `"Unsafe"` fallthrough and non-dict JSON crashes (`SOSBench` `#2884`).
+
 ## Author & Contact
 
 - **Author:** Göktuğ Özkan, MD (`drozkan2@gmail.com`, ORCID: `0000-0002-5022-9124`)

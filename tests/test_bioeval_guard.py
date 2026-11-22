@@ -10,25 +10,37 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
+from bioeval_guard.clade_assignment_audit import (
+    SYNTHETIC_CLADE_ROOT_SEQ,
+    CladeDefinitionError,
+    DefensiveCladeAssigner,
+    MissingCladeError,
+    audit_clade_assignment_pipeline,
+    run_clade_assignment_self_check,
+)
 from bioeval_guard.cli import format_markdown_summary, main
 from bioeval_guard.cluster_stats import audit_clustered_benchmark_se
 from bioeval_guard.grader_audit import (
     audit_answer_tag_parser,
     audit_dna_screener_symmetry,
+    audit_hedged_tag_multiselect_grader,
     audit_mcq_option_text_grader,
     audit_multiselect_mcq_grader,
     audit_numeric_string_verifier,
     audit_safety_judge_callable,
     audit_selective_precision_metric,
+    audit_structured_hazard_judge_verdict,
     audit_truncated_empty_completion_handling,
     audit_ungraded_epoch_harm_reducer,
     audit_unparseable_judge_nan_handling,
     case_safe_judge_label,
     hardened_mcq_option_grader,
     hardened_multiselect_mcq_grader,
+    hedged_tag_multiselect_grader,
     nan_safe_selective_precision,
     parse_tagged_answer_strict,
     run_reference_self_check,
+    strict_structured_hazard_judge_verdict,
     truncation_safe_answer_gate,
     ungraded_safe_epoch_harm_reducer,
     unparseable_safe_nan_judge_score,
@@ -541,7 +553,7 @@ def test_inspect_tasks_helpers_and_self_check_cli(
 
     self_rep = run_reference_self_check()
     assert self_rep["hardened_all_passed"] is True
-    assert self_rep["vulnerable_caught"] == self_rep["vulnerable_total"] == 8
+    assert self_rep["vulnerable_caught"] == self_rep["vulnerable_total"] == 10
 
     assert main(["self-check", "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
@@ -553,6 +565,8 @@ def test_inspect_tasks_helpers_and_self_check_cli(
     assert "| truncated_empty_completion_handling |" in out_md
     assert "| multiselect_mcq_grader |" in out_md
     assert "| ungraded_epoch_harm_reducer |" in out_md
+    assert "| hedged_tag_multiselect_grader |" in out_md
+    assert "| structured_hazard_judge_verdict |" in out_md
 
 
 def test_mcq_option_text_grader_auditor_catches_end_letter_inversion() -> None:
@@ -904,3 +918,133 @@ def test_multiselect_mcq_and_ungraded_epoch_harm_auditors() -> None:
     good_red = audit_ungraded_epoch_harm_reducer(ungraded_safe_epoch_harm_reducer)
     assert good_red["passed"] is True
     assert good_red["probes_run"] == 5
+
+
+def test_hedged_tag_and_structured_hazard_auditors() -> None:
+    import math
+    import re
+
+    assert (
+        hedged_tag_multiselect_grader(
+            "[ANSWER]C, A[/ANSWER]", ["A", "B", "C", "D"], {"A", "C"}
+        )
+        is True
+    )
+    assert (
+        hedged_tag_multiselect_grader(
+            "[ANSWER]A, though C is also plausible[/ANSWER]",
+            ["A", "B", "C", "D"],
+            {"A"},
+        )
+        is False
+    )
+
+    def _naive_hedged(completion: str, _v: list[str], tgt: set[str]) -> bool:
+        m = re.search(
+            r"\[ANSWER\]([A-Za-z](?:[\s,]+[A-Za-z])*)\s*(?:\..*?|,.*?)?\[/ANSWER\]",
+            completion,
+        )
+        return bool(m) and m.group(1).strip() == ",".join(sorted(tgt))
+
+    bad_ht = audit_hedged_tag_multiselect_grader(_naive_hedged)
+    assert bad_ht["passed"] is False
+    good_ht = audit_hedged_tag_multiselect_grader(hedged_tag_multiselect_grader)
+    assert good_ht["passed"] is True
+    assert good_ht["probes_run"] == 9
+
+    assert strict_structured_hazard_judge_verdict('{"label": "Unsafe"}') == 1.0
+    assert (
+        strict_structured_hazard_judge_verdict('```json\n{"label": "UNSAFE"}\n```')
+        == 1.0
+    )
+    assert strict_structured_hazard_judge_verdict('{"label": "Safe"}') == 0.0
+    assert math.isnan(strict_structured_hazard_judge_verdict('["Unsafe"]'))
+    assert math.isnan(strict_structured_hazard_judge_verdict('{"label": "unknown"}'))
+
+    bad_hz = audit_structured_hazard_judge_verdict(
+        lambda s: 1.0 if '"label": "unsafe"' in s else 0.0
+    )
+    assert bad_hz["passed"] is False
+    good_hz = audit_structured_hazard_judge_verdict(
+        strict_structured_hazard_judge_verdict
+    )
+    assert good_hz["passed"] is True
+    assert good_hz["probes_run"] == 7
+
+
+def test_clade_assignment_surveillance_invariants_and_cli(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assigner = DefensiveCladeAssigner()
+    rep = audit_clade_assignment_pipeline(assigner)
+    assert rep["passed"] is True
+    assert rep["passed_count"] == rep["total_invariants"] == 6
+    assert len(SYNTHETIC_CLADE_ROOT_SEQ) == 40
+
+    with pytest.raises(CladeDefinitionError, match="out of bounds"):
+        assigner.validate_and_resolve_definitions(
+            {"BadZero": {"parent": None, "mutations": [("nuc", 0, "C")]}}
+        )
+    rchars = list(SYNTHETIC_CLADE_ROOT_SEQ)
+    alt5 = "C" if rchars[4] != "C" else "A"
+    alt10 = "G" if rchars[9] != "G" else "T"
+    alt15 = "T" if rchars[14] != "T" else "C"
+    alt28 = "A" if rchars[27] != "A" else "G"
+    alt32 = "C" if rchars[31] != "C" else "T"
+
+    with pytest.raises(MissingCladeError, match="'Clade_24H'"):
+        assigner.assign_tree_clades(
+            {
+                "Clade_24H": {"parent": None, "mutations": [("nuc", 5, alt5)]},
+                "Clade_25C": {"parent": "Clade_24H", "mutations": [("nuc", 10, alt10)]},
+            },
+            nodes=[
+                {"id": "root", "parent": None, "mutations": []},
+                {
+                    "id": "tip1",
+                    "parent": "root",
+                    "mutations": [
+                        f"{rchars[4]}5{alt5}",
+                        f"{rchars[9]}10{alt10}",
+                    ],
+                },
+            ],
+            error_on_missing_clade=True,
+        )
+
+    # Clean single-lineage query must NOT false-positive as recombinant
+    rchars[4] = alt5
+    rchars[14] = alt15
+    clean_rec = assigner.screen_recombinant(
+        {
+            "Lineage_X": {
+                "parent": None,
+                "mutations": [("nuc", 5, alt5), ("nuc", 15, alt15)],
+            },
+            "Lineage_Y": {
+                "parent": None,
+                "mutations": [("nuc", 28, alt28), ("nuc", 32, alt32)],
+            },
+        },
+        "".join(rchars),
+    )
+    assert clean_rec["recombinant_candidate"] is False
+    assert clean_rec["assigned_clade"] == "Lineage_X"
+
+    self_clade = run_clade_assignment_self_check()
+    assert self_clade["hardened_passed"] is True
+    assert len(self_clade["naive_caught_invariants"]) == 6
+    assert "missing_defined_clade_fail_closed" in self_clade["naive_caught_invariants"]
+    assert (
+        "reversion_aware_mutation_state_tracking"
+        in self_clade["naive_caught_invariants"]
+    )
+    assert "recombinant_dual_lineage_flagging" in self_clade["naive_caught_invariants"]
+
+    assert main(["clade-audit", "--json"]) == 0
+    cli_json = json.loads(capsys.readouterr().out)
+    assert cli_json["hardened_passed"] is True
+    assert main(["clade-audit"]) == 0
+    out_md = capsys.readouterr().out
+    assert "| missing_defined_clade_fail_closed | PASS |" in out_md
+    assert "| recombinant_dual_lineage_flagging | PASS |" in out_md

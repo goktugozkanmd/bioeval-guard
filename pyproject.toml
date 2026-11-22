@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bioeval-guard"
-version = "0.7.0"
+version = "0.8.0"
 description = "Deterministic hygiene, biological sequence integrity, and question-blind shortcut auditing for frontier AI biosecurity and biology benchmarks."
 readme = "README.md"
 license = {text = "MIT"}
