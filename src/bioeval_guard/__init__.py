@@ -4,10 +4,12 @@ from .cluster_stats import audit_clustered_benchmark_se
 from .grader_audit import (
     audit_answer_tag_parser,
     audit_dna_screener_symmetry,
+    audit_mcq_option_text_grader,
     audit_numeric_string_verifier,
     audit_safety_judge_callable,
     audit_selective_precision_metric,
     case_safe_judge_label,
+    hardened_mcq_option_grader,
     nan_safe_selective_precision,
     parse_tagged_answer_strict,
     run_reference_self_check,
@@ -33,6 +35,15 @@ from .inspect_tasks import (
     filter_clean_lab_bench_records,
     nan_safe_precision_metric,
 )
+from .sequence_screening_audit import (
+    SYNTHETIC_CONTROL_KMER,
+    SYNTHETIC_CONTROL_OLIGO,
+    SYNTHETIC_NEGATIVE_OLIGO,
+    DefensiveKmerScreener,
+    audit_sequence_screener,
+    normalize_fasta_records,
+    run_screening_self_check,
+)
 from .shortcuts import (
     audit_question_blind_shortcuts,
     holm_bonferroni,
@@ -40,15 +51,21 @@ from .shortcuts import (
 
 __all__ = [
     "AuditItem",
+    "DefensiveKmerScreener",
     "LAB_BENCH_DATASET_REVISION",
     "LAB_BENCH_REVISION_PIN",
+    "SYNTHETIC_CONTROL_KMER",
+    "SYNTHETIC_CONTROL_OLIGO",
+    "SYNTHETIC_NEGATIVE_OLIGO",
     "audit_answer_tag_parser",
     "audit_clustered_benchmark_se",
     "audit_dna_screener_symmetry",
+    "audit_mcq_option_text_grader",
     "audit_numeric_string_verifier",
     "audit_question_blind_shortcuts",
     "audit_safety_judge_callable",
     "audit_selective_precision_metric",
+    "audit_sequence_screener",
     "case_safe_judge_label",
     "check_bixbench_hygiene",
     "check_mcq_hygiene",
@@ -57,15 +74,18 @@ __all__ = [
     "complement_dna",
     "compute_nan_safe_precision_and_coverage",
     "filter_clean_lab_bench_records",
+    "hardened_mcq_option_grader",
     "holm_bonferroni",
     "nan_safe_precision_metric",
     "nan_safe_selective_precision",
+    "normalize_fasta_records",
     "normalize_items",
     "parse_tagged_answer_strict",
     "question_blind_centroid_baseline",
     "reverse_complement_dna",
     "run_reference_self_check",
+    "run_screening_self_check",
     "sanitize_mcq_dataset",
 ]
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"

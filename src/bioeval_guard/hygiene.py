@@ -103,7 +103,9 @@ def load_records(path: str | Path) -> list[dict[str, Any]]:
     raise ValueError(f"Unsupported dataset extension: {p.suffix}")
 
 
-def normalize_items(records: list[dict[str, Any]], dataset_name: str = "dataset") -> list[AuditItem]:
+def normalize_items(
+    records: list[dict[str, Any]], dataset_name: str = "dataset"
+) -> list[AuditItem]:
     """Normalize LAB-Bench, BixBench, and WMDP record schemas into AuditItem objects."""
     items: list[AuditItem] = []
     for idx, rec in enumerate(records):
@@ -112,19 +114,30 @@ def normalize_items(records: list[dict[str, Any]], dataset_name: str = "dataset"
             dists = [str(d) for d in rec["distractors"]]
             opts = [ideal] + dists
             ideal_idx = 0
-            item_id = str(rec.get("question_id") or rec.get("id") or f"{dataset_name}-{idx}")
+            item_id = str(
+                rec.get("question_id") or rec.get("id") or f"{dataset_name}-{idx}"
+            )
             subtask = str(rec.get("subtask") or rec.get("eval_mode") or dataset_name)
         elif "choices" in rec and "answer" in rec:
             opts = [str(c) for c in rec["choices"]]
             ans = rec["answer"]
-            if isinstance(ans, str) and ans.strip().upper() in {"A", "B", "C", "D", "E", "F"}:
+            if isinstance(ans, str) and ans.strip().upper() in {
+                "A",
+                "B",
+                "C",
+                "D",
+                "E",
+                "F",
+            }:
                 ideal_idx = ord(ans.strip().upper()) - ord("A")
             else:
                 ideal_idx = int(ans)
             item_id = str(rec.get("id") or f"{dataset_name}-{idx}")
             subtask = str(rec.get("subtask") or dataset_name)
         else:
-            raise ValueError(f"Unrecognized MCQ schema keys at row {idx}: {sorted(rec.keys())}")
+            raise ValueError(
+                f"Unrecognized MCQ schema keys at row {idx}: {sorted(rec.keys())}"
+            )
 
         meta = {
             k: v
@@ -144,7 +157,9 @@ def normalize_items(records: list[dict[str, Any]], dataset_name: str = "dataset"
     return items
 
 
-def check_primer_reverse_complement(template_dna: str, reverse_primer: str, anchor_len: int = 15) -> bool:
+def check_primer_reverse_complement(
+    template_dna: str, reverse_primer: str, anchor_len: int = 15
+) -> bool:
     """Return True if reverse_primer anneals to coding template (matches reverse complement, not sense strand).
 
     Returns False when the primer copies the raw 5'->3' sense tail verbatim (PCR-incompatible).
@@ -183,7 +198,9 @@ def _is_comma_split_shard(ideal: str, distractors: list[str]) -> bool:
     )
 
 
-def check_mcq_hygiene(items: list[AuditItem], check_biology: bool = True) -> dict[str, Any]:
+def check_mcq_hygiene(
+    items: list[AuditItem], check_biology: bool = True
+) -> dict[str, Any]:
     """Run deterministic key-collision, null-value, duplicate, comma-split, and biology checks."""
     ideal_in_dist_exact: list[str] = []
     ideal_in_dist_norm: list[str] = []
@@ -195,7 +212,9 @@ def check_mcq_hygiene(items: list[AuditItem], check_biology: bool = True) -> dic
     sense_reverse_primer_bugs: list[str] = []
     comp_restriction_bugs: list[str] = []
     isoschizomer_collisions: list[str] = []
-    question_counts = Counter(it.question.strip().lower() for it in items if it.question.strip())
+    question_counts = Counter(
+        it.question.strip().lower() for it in items if it.question.strip()
+    )
 
     for it in items:
         ideal = it.ideal
@@ -231,8 +250,13 @@ def check_mcq_hygiene(items: list[AuditItem], check_biology: bool = True) -> dic
                 if seqs and not check_primer_reverse_complement(dna, seqs[-1]):
                     sense_reverse_primer_bugs.append(it.item_id)
                 if "enzprimers" in it.subtask and len(seqs) >= 2:
-                    enzymes = re.findall(r"\b(" + "|".join(RESTRICTION_SITES.keys()) + r")\b", it.question)
-                    if len(enzymes) >= 2 and check_restriction_site_complement_bug(enzymes[1], seqs[-1]):
+                    enzymes = re.findall(
+                        r"\b(" + "|".join(RESTRICTION_SITES.keys()) + r")\b",
+                        it.question,
+                    )
+                    if len(enzymes) >= 2 and check_restriction_site_complement_bug(
+                        enzymes[1], seqs[-1]
+                    ):
                         comp_restriction_bugs.append(it.item_id)
             if "geneprimers-enz" in it.subtask:
                 canon = [_canonicalize_enzyme_tuple(o) for o in it.options]
@@ -262,7 +286,9 @@ def check_mcq_hygiene(items: list[AuditItem], check_biology: bool = True) -> dic
         "empty_option_items": len(empty_option_items),
         "comma_split_distractor_items": len(comma_split_items),
         "comma_split_ids": comma_split_items,
-        "duplicate_question_texts": sum(c - 1 for c in question_counts.values() if c > 1),
+        "duplicate_question_texts": sum(
+            c - 1 for c in question_counts.values() if c > 1
+        ),
         "meta_phrase_ideal_only_items": len(meta_ideal_only_items),
         "sense_reverse_primer_bugs": len(sense_reverse_primer_bugs),
         "comp_restriction_bugs": len(comp_restriction_bugs),

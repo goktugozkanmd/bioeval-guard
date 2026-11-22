@@ -15,10 +15,12 @@ from bioeval_guard.cluster_stats import audit_clustered_benchmark_se
 from bioeval_guard.grader_audit import (
     audit_answer_tag_parser,
     audit_dna_screener_symmetry,
+    audit_mcq_option_text_grader,
     audit_numeric_string_verifier,
     audit_safety_judge_callable,
     audit_selective_precision_metric,
     case_safe_judge_label,
+    hardened_mcq_option_grader,
     nan_safe_selective_precision,
     parse_tagged_answer_strict,
     run_reference_self_check,
@@ -44,6 +46,14 @@ from bioeval_guard.inspect_tasks import (
     compute_nan_safe_precision_and_coverage,
     filter_clean_lab_bench_records,
     nan_safe_precision_metric,
+)
+from bioeval_guard.sequence_screening_audit import (
+    SYNTHETIC_CONTROL_KMER,
+    SYNTHETIC_CONTROL_OLIGO,
+    DefensiveKmerScreener,
+    audit_sequence_screener,
+    normalize_fasta_records,
+    run_screening_self_check,
 )
 from bioeval_guard.shortcuts import (
     audit_question_blind_shortcuts,
@@ -229,7 +239,11 @@ def test_bixbench_hygiene_checks() -> None:
     rep = check_bixbench_hygiene(normalize_items(records))
     assert rep["str_verifier_notation_mismatches"] == 1
     assert rep["range_verifier_overlapping_intervals"] == 1
-    assert rep["eval_mode_counts"] == {"str_verifier": 1, "range_verifier": 1, "llm_verifier": 1}
+    assert rep["eval_mode_counts"] == {
+        "str_verifier": 1,
+        "range_verifier": 1,
+        "llm_verifier": 1,
+    }
 
 
 def test_normalize_wmdp_and_error_schema() -> None:
@@ -247,11 +261,15 @@ def test_normalize_wmdp_and_error_schema() -> None:
 
 def test_load_records_json_jsonl_parquet_and_invalid(tmp_path: Path) -> None:
     jpath = tmp_path / "data.json"
-    jpath.write_text('[{"id":"1","question":"Q","ideal":"A","distractors":["B"]}]', encoding="utf-8")
+    jpath.write_text(
+        '[{"id":"1","question":"Q","ideal":"A","distractors":["B"]}]', encoding="utf-8"
+    )
     assert len(load_records(jpath)) == 1
 
     pq_path = tmp_path / "data.parquet"
-    table = pa.table({"question": ["Q"], "choices": [["A", "B", "C", "D"]], "answer": [0]})
+    table = pa.table(
+        {"question": ["Q"], "choices": [["A", "B", "C", "D"]], "answer": [0]}
+    )
     pq.write_table(table, pq_path)
     assert len(load_records(pq_path)) == 1
 
@@ -267,7 +285,9 @@ def test_holm_bonferroni_exact_and_empty() -> None:
 
 
 def test_compute_option_features_within_item_normalized() -> None:
-    rel, mean_sims, char_lens = compute_option_features(["AAAA", "AAAB", "AAAC", "ZZZZZZZZ"])
+    rel, mean_sims, char_lens = compute_option_features(
+        ["AAAA", "AAAB", "AAAC", "ZZZZZZZZ"]
+    )
     assert rel.shape == (4, 10)
     assert char_lens == [4, 4, 4, 8]
     assert mean_sims[0] > mean_sims[3]
@@ -286,7 +306,11 @@ def test_star_graph_centroid_exploit() -> None:
             mut = seq[:]
             mut[pos] = "A" if mut[pos] != "A" else "G"
             dists.append("".join(mut))
-        items.append(AuditItem(item_id=f"s{i}", question="Which?", options=[ideal] + dists, ideal_idx=0))
+        items.append(
+            AuditItem(
+                item_id=f"s{i}", question="Which?", options=[ideal] + dists, ideal_idx=0
+            )
+        )
 
     res = audit_question_blind_shortcuts(items)
     assert res["centroid"]["acc"] == 1.0
@@ -299,7 +323,12 @@ def test_longest_option_shortcut() -> None:
         AuditItem(
             item_id=f"l{i}",
             question="Q",
-            options=["Very detailed mechanistic biological explanation here", "Short A", "Short B", "Short C"],
+            options=[
+                "Very detailed mechanistic biological explanation here",
+                "Short A",
+                "Short B",
+                "Short C",
+            ],
             ideal_idx=0,
         )
         for i in range(40)
@@ -314,7 +343,9 @@ def test_clean_balanced_options_near_chance() -> None:
     items: list[AuditItem] = []
     for i in range(80):
         opts = [f"gene_{rng.randint(100, 999)}_{j}" for j in range(4)]
-        items.append(AuditItem(item_id=f"c{i}", question="Q", options=opts, ideal_idx=0))
+        items.append(
+            AuditItem(item_id=f"c{i}", question="Q", options=opts, ideal_idx=0)
+        )
     res = audit_question_blind_shortcuts(items)
     assert res["centroid"]["p_raw"] > 0.05
     assert res["longest"]["p_raw"] > 0.05
@@ -327,13 +358,20 @@ def test_empty_shortcut_audit_returns_zero() -> None:
 def test_inspect_adapter_sanitize_and_baseline() -> None:
     records = [
         {"id": "bad", "question": "Q", "ideal": "null", "distractors": ["A", "B", "C"]},
-        {"id": "good", "question": "Q", "ideal": "Valid", "distractors": ["D1", "D2", "D3"]},
+        {
+            "id": "good",
+            "question": "Q",
+            "ideal": "Valid",
+            "distractors": ["D1", "D2", "D3"],
+        },
     ]
     clean, rep = sanitize_mcq_dataset(records)
     assert rep["removed_items"] == 1
     assert [r["id"] for r in clean] == ["good"]
 
-    pred = question_blind_centroid_baseline(["ZZZ_DIFF", "AAACCC1", "AAACCC2", "AAACCC3"])
+    pred = question_blind_centroid_baseline(
+        ["ZZZ_DIFF", "AAACCC1", "AAACCC2", "AAACCC3"]
+    )
     assert pred in {1, 2, 3}
     with pytest.raises(ValueError, match="non-empty"):
         question_blind_centroid_baseline([])
@@ -344,7 +382,9 @@ def test_inspect_adapter_sanitize_and_baseline() -> None:
     assert keep(norm[1]) is True
 
 
-def test_cli_audit_jsonl_json_and_summary(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_cli_audit_jsonl_json_and_summary(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     p = tmp_path / "sample.jsonl"
     p.write_text(
         '{"id":"1","question":"Q","ideal":"Alpha","distractors":["Beta","Gamma","Delta"]}\n'
@@ -353,11 +393,13 @@ def test_cli_audit_jsonl_json_and_summary(tmp_path: Path, capsys: pytest.Capture
     )
     pq_path = tmp_path / "sample_wmdp.parquet"
     pq.write_table(
-        pa.table({
-            "question": [f"Q{i}" for i in range(12)],
-            "choices": [["A1", "B2", "C3", "D4"] for _ in range(12)],
-            "answer": [0 for _ in range(12)],
-        }),
+        pa.table(
+            {
+                "question": [f"Q{i}" for i in range(12)],
+                "choices": [["A1", "B2", "C3", "D4"] for _ in range(12)],
+                "answer": [0 for _ in range(12)],
+            }
+        ),
         pq_path,
     )
     assert main(["audit-jsonl", str(p), "--json"]) == 0
@@ -378,37 +420,56 @@ def test_format_markdown_empty() -> None:
 
 def test_grader_auditors_detect_real_defects_and_pass_hardened() -> None:
     # 1. Safety judge auditor
-    bad_judge = audit_safety_judge_callable(lambda s: "unsafe" if '"label": "unsafe"' in s else "safe")
+    bad_judge = audit_safety_judge_callable(
+        lambda s: "unsafe" if '"label": "unsafe"' in s else "safe"
+    )
     assert bad_judge["passed"] is False
     assert len(bad_judge["failures"]) == 5
     good_judge = audit_safety_judge_callable(case_safe_judge_label)
     assert good_judge["passed"] is True
 
     # 2. Tag parser auditor
-    bad_parser = audit_answer_tag_parser(lambda s: s[s.find("<answer>") + 8 : s.find("</answer>")])
+    bad_parser = audit_answer_tag_parser(
+        lambda s: s[s.find("<answer>") + 8 : s.find("</answer>")]
+    )
     assert bad_parser["passed"] is False
-    good_parser = audit_answer_tag_parser(lambda s: parse_tagged_answer_strict(s, strip_upper=True))
+    good_parser = audit_answer_tag_parser(
+        lambda s: parse_tagged_answer_strict(s, strip_upper=True)
+    )
     assert good_parser["passed"] is True
 
     # 3. Numeric string verifier auditor
     import re
 
     bad_num = audit_numeric_string_verifier(
-        lambda t, p: re.sub(r"[^a-zA-Z0-9]", "", t).lower() == re.sub(r"[^a-zA-Z0-9]", "", p).lower()
+        lambda t, p: (
+            re.sub(r"[^a-zA-Z0-9]", "", t).lower()
+            == re.sub(r"[^a-zA-Z0-9]", "", p).lower()
+        )
     )
     assert bad_num["passed"] is False
-    good_num = audit_numeric_string_verifier(lambda t, p: t.strip() == p.strip() and t.strip() != "")
+    good_num = audit_numeric_string_verifier(
+        lambda t, p: t.strip() == p.strip() and t.strip() != ""
+    )
     assert good_num["passed"] is True
 
     # 4. Selective precision metric auditor
     bad_metric = audit_selective_precision_metric(
-        lambda xs: 0.0 if not [x for x in xs if x != -1] else sum(x for x in xs if x != -1) / len([x for x in xs if x != -1]),
+        lambda xs: (
+            0.0
+            if not [x for x in xs if x != -1]
+            else sum(x for x in xs if x != -1) / len([x for x in xs if x != -1])
+        ),
         lambda xs: len([x for x in xs if x != -1]) / len(xs) if xs else 0.0,
     )
     assert bad_metric["passed"] is False
     good_metric = audit_selective_precision_metric(
-        lambda xs: nan_safe_selective_precision([float(x) for x in xs if x != -1], len(xs))[0],
-        lambda xs: nan_safe_selective_precision([float(x) for x in xs if x != -1], len(xs))[1],
+        lambda xs: nan_safe_selective_precision(
+            [float(x) for x in xs if x != -1], len(xs)
+        )[0],
+        lambda xs: nan_safe_selective_precision(
+            [float(x) for x in xs if x != -1], len(xs)
+        )[1],
     )
     assert good_metric["passed"] is True
 
@@ -417,7 +478,9 @@ def test_grader_auditors_detect_real_defects_and_pass_hardened() -> None:
     assert asymmetric["passed"] is False
 
 
-def test_inspect_tasks_helpers_and_self_check_cli(capsys: pytest.CaptureFixture[str]) -> None:
+def test_inspect_tasks_helpers_and_self_check_cli(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     import math
 
     assert LAB_BENCH_REVISION_PIN() == "5c77cec648430f30611808808861eb86f81d5eaa"
@@ -428,8 +491,18 @@ def test_inspect_tasks_helpers_and_self_check_cli(capsys: pytest.CaptureFixture[
 
     kept, rep = filter_clean_lab_bench_records(
         [
-            {"id": "k1", "question": "Q1", "ideal": "null", "distractors": ["A", "B", "C"]},
-            {"id": "k2", "question": "Q2", "ideal": "BRCA1", "distractors": ["TP53", "EGFR", "MYC"]},
+            {
+                "id": "k1",
+                "question": "Q1",
+                "ideal": "null",
+                "distractors": ["A", "B", "C"],
+            },
+            {
+                "id": "k2",
+                "question": "Q2",
+                "ideal": "BRCA1",
+                "distractors": ["TP53", "EGFR", "MYC"],
+            },
         ],
         subset_name="LitQA2",
         check_biology=False,
@@ -439,13 +512,82 @@ def test_inspect_tasks_helpers_and_self_check_cli(capsys: pytest.CaptureFixture[
 
     self_rep = run_reference_self_check()
     assert self_rep["hardened_all_passed"] is True
-    assert self_rep["vulnerable_caught"] == self_rep["vulnerable_total"] == 3
+    assert self_rep["vulnerable_caught"] == self_rep["vulnerable_total"] == 4
 
     assert main(["self-check", "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["hardened_all_passed"] is True
     assert main(["self-check"]) == 0
-    assert "| dna_screener_symmetry |" in capsys.readouterr().out
+    assert "| mcq_option_text_grader |" in capsys.readouterr().out
+
+
+def test_mcq_option_text_grader_auditor_catches_end_letter_inversion() -> None:
+    import re
+
+    def naive_end_letter(completion: str, _choices: list[str], target: str) -> bool:
+        letters = re.findall(r"[A-Za-z]", completion)
+        return bool(letters) and letters[-1].upper() == target.strip().upper()
+
+    bad = audit_mcq_option_text_grader(naive_end_letter)
+    assert bad["passed"] is False
+    failed_probes = {f["probe"] for f in bad["failures"]}
+    assert "letter_plus_correct_text" in failed_probes
+    assert "wrong_letter_ending_in_target_char" in failed_probes
+    assert "labeled_wrong_answer_ending_in_target_char" in failed_probes
+
+    good = audit_mcq_option_text_grader(hardened_mcq_option_grader)
+    assert good["passed"] is True
+
+
+def test_sequence_screening_invariants_and_cli(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    screener = DefensiveKmerScreener()
+    rep = audit_sequence_screener(screener.screen, screener.screen_batch)
+    assert rep["passed"] is True
+    assert rep["passed_count"] == rep["total_invariants"] == 6
+
+    # Naive substring screener must fail 5 of 6 invariants
+    naive_rep = audit_sequence_screener(lambda s: SYNTHETIC_CONTROL_KMER in s)
+    assert naive_rep["passed"] is False
+    assert naive_rep["passed_count"] == 1
+
+    # Screener that naively strips non-ACGT characters fabricates a gapped chimera
+    import re
+
+    stripping_rep = audit_sequence_screener(
+        lambda s: SYNTHETIC_CONTROL_KMER in re.sub(r"[^ACGT]", "", s.upper())
+    )
+    assert stripping_rep["passed"] is False
+    iupac_inv = [
+        inv
+        for inv in stripping_rep["invariants"]
+        if inv["invariant"] == "iupac_ambiguity_resilience"
+    ][0]
+    assert iupac_inv["passed"] is False
+
+    # Ensure IUPAC bases are preserved rather than deleted into false chimeras
+    gapped = SYNTHETIC_CONTROL_KMER[:10] + "N" + SYNTHETIC_CONTROL_KMER[10:]
+    assert screener.screen(gapped) is False
+
+    # Ensure header injection and RNA uracil normalization work properly
+    recs = normalize_fasta_records(
+        f">hdr\n{SYNTHETIC_CONTROL_OLIGO.lower().replace('t', 'u')}\n"
+    )
+    assert len(recs) == 1
+    assert "U" not in recs[0]
+
+    self_screen = run_screening_self_check()
+    assert self_screen["hardened_passed"] is True
+    assert len(self_screen["naive_caught_invariants"]) == 5
+    assert "circular_origin_wrap" in self_screen["naive_caught_invariants"]
+    assert "tiled_boundary_split" in self_screen["naive_caught_invariants"]
+
+    assert main(["screen-audit", "--json"]) == 0
+    cli_json = json.loads(capsys.readouterr().out)
+    assert cli_json["hardened_passed"] is True
+    assert main(["screen-audit"]) == 0
+    assert "| circular_origin_wrap | PASS |" in capsys.readouterr().out
 
 
 def test_clustered_benchmark_se_invariants_and_cli(
@@ -483,7 +625,8 @@ def test_clustered_benchmark_se_invariants_and_cli(
     jpath = tmp_path / "capsules.jsonl"
     jpath.write_text(
         "\n".join(
-            json.dumps({"score": s, "cluster_id": c}) for s, c in zip(corr_scores, corr_ids)
+            json.dumps({"score": s, "cluster_id": c})
+            for s, c in zip(corr_scores, corr_ids)
         ),
         encoding="utf-8",
     )

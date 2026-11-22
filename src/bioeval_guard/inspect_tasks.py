@@ -98,7 +98,11 @@ if HAS_INSPECT_AI:  # pragma: no cover - requires optional inspect-ai
             Sample(
                 id=str(rec["id"]),
                 input=str(rec["question"]),
-                choices=[str(rec["ideal"]), *(str(d) for d in rec["distractors"]), UNCERTAIN_ANSWER_CHOICE],
+                choices=[
+                    str(rec["ideal"]),
+                    *(str(d) for d in rec["distractors"]),
+                    UNCERTAIN_ANSWER_CHOICE,
+                ],
                 target="A",
             )
             for rec in clean_records
@@ -136,11 +140,15 @@ else:
 
     def bioeval_lab_bench_seqqa_sanitized() -> Any:
         """Raise informative error when inspect_ai optional extra is not installed."""
-        raise ImportError("Install optional dependency `bioeval-guard[inspect]` to run Inspect AI tasks.")
+        raise ImportError(
+            "Install optional dependency `bioeval-guard[inspect]` to run Inspect AI tasks."
+        )
 
     def bioeval_lab_bench_litqa2_sanitized() -> Any:
         """Raise informative error when inspect_ai optional extra is not installed."""
-        raise ImportError("Install optional dependency `bioeval-guard[inspect]` to run Inspect AI tasks.")
+        raise ImportError(
+            "Install optional dependency `bioeval-guard[inspect]` to run Inspect AI tasks."
+        )
 
 
 def LAB_BENCH_REVISION_PIN() -> str:

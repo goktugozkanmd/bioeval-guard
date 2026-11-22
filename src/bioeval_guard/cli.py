@@ -16,10 +16,13 @@ from .hygiene import (
     load_records,
     normalize_items,
 )
+from .sequence_screening_audit import run_screening_self_check
 from .shortcuts import audit_question_blind_shortcuts, holm_bonferroni
 
 
-def audit_file(path: Path, name: str | None = None, check_biology: bool = True) -> dict[str, Any]:
+def audit_file(
+    path: Path, name: str | None = None, check_biology: bool = True
+) -> dict[str, Any]:
     """Audit a single Parquet, JSONL, or JSON evaluation dataset file."""
     ds_name = name or path.stem
     records = load_records(path)
@@ -28,7 +31,12 @@ def audit_file(path: Path, name: str | None = None, check_biology: bool = True) 
     if any("eval_mode" in rec for rec in records):
         hygiene["bixbench"] = check_bixbench_hygiene(items)
     shortcuts = audit_question_blind_shortcuts(items)
-    return {"dataset": ds_name, "path": str(path), "hygiene": hygiene, "shortcuts": shortcuts}
+    return {
+        "dataset": ds_name,
+        "path": str(path),
+        "hygiene": hygiene,
+        "shortcuts": shortcuts,
+    }
 
 
 def format_markdown_summary(results: list[dict[str, Any]]) -> str:
@@ -55,14 +63,16 @@ def format_markdown_summary(results: list[dict[str, Any]]) -> str:
         )
         lines.append(
             f"| {res['dataset']} | {h['total_items']} | {h['flagged_items']} | "
-            f"{s['chance']*100:.1f}% | {s['centroid']['acc']*100:.1f}% | "
-            f"{s['longest']['acc']*100:.1f}% | {s['oof_5fold']['acc']*100:.1f}% | {p_min:.2e} |"
+            f"{s['chance'] * 100:.1f}% | {s['centroid']['acc'] * 100:.1f}% | "
+            f"{s['longest']['acc'] * 100:.1f}% | {s['oof_5fold']['acc'] * 100:.1f}% | {p_min:.2e} |"
         )
     return "\n".join(lines)
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="bioeval-guard", description="Audit AIxBio benchmarks.")
+    parser = argparse.ArgumentParser(
+        prog="bioeval-guard", description="Audit AIxBio benchmarks."
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     for cmd in ("audit-parquet", "audit-jsonl"):
@@ -70,23 +80,49 @@ def build_parser() -> argparse.ArgumentParser:
         p.add_argument("path", type=Path, help="Path to dataset file.")
         p.add_argument("--name", type=str, default=None, help="Display name.")
         p.add_argument("--no-bio", action="store_true", help="Skip DNA/primer checks.")
-        p.add_argument("--json", action="store_true", help="Emit JSON instead of Markdown.")
+        p.add_argument(
+            "--json", action="store_true", help="Emit JSON instead of Markdown."
+        )
 
-    ps = sub.add_parser("summary", help="Audit multiple dataset files and emit Markdown table.")
+    ps = sub.add_parser(
+        "summary", help="Audit multiple dataset files and emit Markdown table."
+    )
     ps.add_argument("paths", nargs="+", type=Path, help="Paths to Parquet/JSONL files.")
-    ps.add_argument("--json-out", type=Path, default=None, help="Optional JSON output path.")
+    ps.add_argument(
+        "--json-out", type=Path, default=None, help="Optional JSON output path."
+    )
 
-    psc = sub.add_parser("self-check", help="Verify reference hardened vs vulnerable grader/screener checks.")
+    psc = sub.add_parser(
+        "self-check",
+        help="Verify reference hardened vs vulnerable grader/screener checks.",
+    )
     psc.add_argument("--json", action="store_true", help="Emit JSON output.")
 
     pca = sub.add_parser(
         "cluster-audit",
         help="Compute cluster-robust SE, ICC, DEFF, and effective N on grouped eval records.",
     )
-    pca.add_argument("path", type=Path, help="Path to scored JSON, JSONL, or Parquet file.")
-    pca.add_argument("--score-field", type=str, default="score", help="Numeric score field name.")
-    pca.add_argument("--cluster-field", type=str, default="cluster_id", help="Cluster identifier field name.")
-    pca.add_argument("--json", action="store_true", help="Emit JSON instead of Markdown.")
+    pca.add_argument(
+        "path", type=Path, help="Path to scored JSON, JSONL, or Parquet file."
+    )
+    pca.add_argument(
+        "--score-field", type=str, default="score", help="Numeric score field name."
+    )
+    pca.add_argument(
+        "--cluster-field",
+        type=str,
+        default="cluster_id",
+        help="Cluster identifier field name.",
+    )
+    pca.add_argument(
+        "--json", action="store_true", help="Emit JSON instead of Markdown."
+    )
+
+    psa = sub.add_parser(
+        "screen-audit",
+        help="Audit defensive DNA/RNA screening invariants on benign synthetic reporter oligos.",
+    )
+    psa.add_argument("--json", action="store_true", help="Emit JSON output.")
     return parser
 
 
@@ -157,6 +193,23 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(format_cluster_markdown(report))
         return 0
+
+    if args.command == "screen-audit":
+        report = run_screening_self_check()
+        if args.json:
+            print(json.dumps(report, indent=2))
+        else:
+            lines = ["| Invariant | Status | Detail |", "|---|---|---|"]
+            for inv in report["hardened"]["invariants"]:
+                lines.append(
+                    f"| {inv['invariant']} | {'PASS' if inv['passed'] else 'FAIL'} | {inv['detail']} |"
+                )
+            lines.append(
+                f"| naive_screener_caught | {len(report['naive_caught_invariants'])}/{report['naive_total_invariants']} | "
+                f"{', '.join(report['naive_caught_invariants'])} |"
+            )
+            print("\n".join(lines))
+        return 0 if report["hardened_passed"] else 1
 
     return 1
 

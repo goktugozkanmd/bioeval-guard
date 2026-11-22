@@ -49,6 +49,17 @@ bioeval-guard self-check
 - **Selective precision metrics** (`audit_selective_precision_metric`): distinguishes 100%-abstention (`NaN` precision, `0.0` coverage) from 100%-incorrect (`0.0` precision, `1.0` coverage).
 - **Defensive DNA screener invariance** (`audit_dna_screener_symmetry`): verifies reverse-complement, FASTA/CRLF, and window-shift parity using strictly benign synthetic oligos (zero pathogen sequences).
 
+### v0.4.0 Defensive Sequence-Screening Invariants & MCQ Option-Text Hijack Auditor
+
+```bash
+bioeval-guard screen-audit
+bioeval-guard cluster-audit capsules.jsonl
+```
+
+- **6-Invariant Sequence-Screening Auditor** (`bioeval_guard.sequence_screening_audit.audit_sequence_screener` & `DefensiveKmerScreener`): tests strand symmetry, RNA uracil/case normalization, circular origin wrap-around, tiled fragment boundary assembly, IUPAC ambiguity resilience, and malformed FASTA header safety on strictly benign synthetic linker oligos.
+- **MCQ Option-Text Inversion Auditor** (`audit_mcq_option_text_grader` & `hardened_mcq_option_grader`): catches `location="end"` option-text hijack vulnerabilities (e.g., `"C. extrachromosomal dna"` matching target `"A"`).
+- **Cluster-Robust Benchmark SE/ICC/DEFF Auditor** (`audit_clustered_benchmark_se`): quantifies cluster-inflated precision on correlated multi-question capsules (`BixBench`, `LAB-Bench`).
+
 ## Author & Contact
 
 - **Author:** Göktuğ Özkan, MD (`drozkan2@gmail.com`, ORCID: `0000-0002-5022-9124`)
