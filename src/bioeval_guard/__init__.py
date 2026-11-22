@@ -18,6 +18,14 @@ from .clade_assignment_audit import (
     run_clade_assignment_self_check,
 )
 from .cluster_stats import audit_clustered_benchmark_se
+from .evolutionary_distance_audit import (
+    SYNTHETIC_CLOCK_ROOT_SEQ,
+    DefensiveEvolutionaryDistanceAuditor,
+    EvolutionaryTopologyError,
+    NaivePairwiseRootDistanceCalculator,
+    audit_evolutionary_distance_pipeline,
+    run_evolutionary_distance_self_check,
+)
 from .grader_audit import (
     audit_answer_tag_parser,
     audit_dna_screener_symmetry,
@@ -26,6 +34,7 @@ from .grader_audit import (
     audit_mcq_option_text_grader,
     audit_multiselect_mcq_grader,
     audit_numeric_string_verifier,
+    audit_rubric_header_format_invariance,
     audit_safety_judge_callable,
     audit_selective_precision_metric,
     audit_structured_hazard_judge_verdict,
@@ -35,6 +44,7 @@ from .grader_audit import (
     case_safe_judge_label,
     hardened_mcq_option_grader,
     hardened_multiselect_mcq_grader,
+    header_agnostic_rubric_scorer,
     hedged_tag_multiselect_grader,
     nan_safe_selective_precision,
     parse_tagged_answer_strict,
@@ -107,6 +117,7 @@ __all__ = [
     "LAB_BENCH_DATASET_REVISION",
     "LAB_BENCH_REVISION_PIN",
     "SYNTHETIC_CLADE_ROOT_SEQ",
+    "SYNTHETIC_CLOCK_ROOT_SEQ",
     "SYNTHETIC_CONTROL_KMER",
     "SYNTHETIC_CONTROL_OLIGO",
     "SYNTHETIC_HOST_DECOY_KMER",
@@ -122,12 +133,15 @@ __all__ = [
     "AuditItem",
     "CladeDefinitionError",
     "DefensiveCladeAssigner",
+    "DefensiveEvolutionaryDistanceAuditor",
     "DefensiveKmerScreener",
     "DefensiveMetagenomicScreener",
     "DefensivePhylodynamicScreener",
     "DefensiveProteinScreener",
     "DefensiveTranslationAlignmentScreener",
+    "EvolutionaryTopologyError",
     "MissingCladeError",
+    "NaivePairwiseRootDistanceCalculator",
     "NaiveTranslationAlignmentLoader",
     "TranslationAlignmentError",
     "audit_ancestral_translation_pipeline",
@@ -135,6 +149,7 @@ __all__ = [
     "audit_clade_assignment_pipeline",
     "audit_clustered_benchmark_se",
     "audit_dna_screener_symmetry",
+    "audit_evolutionary_distance_pipeline",
     "audit_hedged_tag_multiselect_grader",
     "audit_judge_parse_error_isolation",
     "audit_mcq_option_text_grader",
@@ -144,6 +159,7 @@ __all__ = [
     "audit_phylodynamic_surveillance_pipeline",
     "audit_protein_screener",
     "audit_question_blind_shortcuts",
+    "audit_rubric_header_format_invariance",
     "audit_safety_judge_callable",
     "audit_selective_precision_metric",
     "audit_sequence_screener",
@@ -161,6 +177,7 @@ __all__ = [
     "filter_clean_lab_bench_records",
     "hardened_mcq_option_grader",
     "hardened_multiselect_mcq_grader",
+    "header_agnostic_rubric_scorer",
     "hedged_tag_multiselect_grader",
     "holm_bonferroni",
     "nan_safe_precision_metric",
@@ -172,6 +189,7 @@ __all__ = [
     "reverse_complement_dna",
     "run_ancestral_translation_self_check",
     "run_clade_assignment_self_check",
+    "run_evolutionary_distance_self_check",
     "run_phylodynamic_self_check",
     "run_protein_screening_self_check",
     "run_reference_self_check",
@@ -186,4 +204,4 @@ __all__ = [
     "unscored_on_unparseable_judge_verdict",
 ]
 
-__version__ = "0.9.0"
+__version__ = "1.0.0"

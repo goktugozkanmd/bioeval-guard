@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bioeval-guard"
-version = "0.9.0"
+version = "1.0.0"
 description = "Deterministic hygiene, biological sequence integrity, and question-blind shortcut auditing for frontier AI biosecurity and biology benchmarks."
 readme = "README.md"
 license = {text = "MIT"}
@@ -14,7 +14,7 @@ authors = [
 requires-python = ">=3.10"
 keywords = ["biosecurity", "ai-safety", "benchmarks", "evaluation", "inspect-ai", "lab-bench", "wmdp", "bixbench"]
 classifiers = [
-  "Development Status :: 4 - Beta",
+  "Development Status :: 5 - Production/Stable",
   "Intended Audience :: Science/Research",
   "License :: OSI Approved :: MIT License",
   "Programming Language :: Python :: 3",

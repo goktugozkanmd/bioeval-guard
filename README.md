@@ -111,6 +111,15 @@ bioeval-guard translation-audit
 - **6-Invariant Ancestral Translation Alignment Auditor** (`bioeval_guard.ancestral_translation_audit` & `DefensiveTranslationAlignmentScreener`): audits modal-length + outlier ID diagnostics (`augur#1919`), duplicate taxon ID fail-closed rejection, CDS-to-protein codon-length parity, nucleotide-passed-as-protein ACGTN collision guarding, internal premature `*` stop-codon preservation, and nucleotide-codon vs AA mutation cross-checking on strictly benign synthetic reporter sequences.
 - **Sign/Decimal Numeric Verifier & Unparseable Judge Isolation Auditors** (`strict_numeric_string_verifier`, `audit_numeric_string_verifier`, `unscored_on_unparseable_judge_verdict`, `audit_judge_parse_error_isolation`): enforces negative sign and decimal preservation (`BixBench` `#47`) while isolating malformed/refused judge completions as `NaN` rather than `0.0` model failures (`cyberseceval_4` `#2934`).
 
+### v1.0.0 Cumulative Molecular-Clock Distance & Header-Agnostic Rubric Auditors
+
+```bash
+bioeval-guard distance-audit
+```
+
+- **6-Invariant Cumulative Evolutionary Distance & Antigenic-Advance Auditor** (`bioeval_guard.evolutionary_distance_audit` & `DefensiveEvolutionaryDistanceAuditor`): audits reversion-saturation recovery via pre-order path integration (`augur#2035`), homoplasy vs. synapomorphy branch-event separation, ambiguous/dropout character exclusion (`N`/`?`), contiguous indel consolidation, directed asymmetric antigenic map invariance with negative-weight rejection, and fail-closed validation on missing ancestral sequences or cyclic topologies using strictly benign synthetic neutral barcodes.
+- **Header-Agnostic Rubric Scorer Auditor** (`header_agnostic_rubric_scorer`, `audit_rubric_header_format_invariance`): prevents Markdown-heading judge outputs (`## Scores`, `#Scores`, headerless `1.b`/`2.b`/`3.b`) from failing silently as `grader_failed` (`strong_reject` `#2916`) while isolating reasoning mentions and rejecting contradictory duplicate scores or out-of-range values.
+
 ## Author & Contact
 
 - **Author:** Göktuğ Özkan, MD (`drozkan2@gmail.com`, ORCID: `0000-0002-5022-9124`)
