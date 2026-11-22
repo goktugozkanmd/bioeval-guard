@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from .amplicon_surveillance_audit import run_amplicon_surveillance_self_check
 from .ancestral_translation_audit import run_ancestral_translation_self_check
 from .clade_assignment_audit import run_clade_assignment_self_check
 from .cluster_stats import audit_clustered_benchmark_se
@@ -172,6 +173,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Audit generative de novo bio-design assembly, Type IIS, split-intein, and frameshift screening invariants.",
     )
     pdes.add_argument("--json", action="store_true", help="Emit JSON output.")
+
+    pamp = sub.add_parser(
+        "amplicon-audit",
+        help="Audit tiled-amplicon primer clipping, duplicate reference, low-depth masking, wastewater deconvolution, and NTC fail-closed invariants.",
+    )
+    pamp.add_argument("--json", action="store_true", help="Emit JSON output.")
     return parser
 
 
@@ -374,6 +381,23 @@ def main(argv: list[str] | None = None) -> int:
                 )
             lines.append(
                 f"| naive_design_screener_caught | {len(report['naive_caught_invariants'])}/{report['naive_total_invariants']} | "
+                f"{', '.join(report['naive_caught_invariants'])} |"
+            )
+            print("\n".join(lines))
+        return 0 if report["hardened_passed"] else 1
+
+    if args.command == "amplicon-audit":
+        report = run_amplicon_surveillance_self_check()
+        if args.json:
+            print(json.dumps(report, indent=2))
+        else:
+            lines = ["| Invariant | Status | Detail |", "|---|---|---|"]
+            for inv in report["hardened"]["invariants"]:
+                lines.append(
+                    f"| {inv['invariant']} | {'PASS' if inv['passed'] else 'FAIL'} | {inv['detail']} |"
+                )
+            lines.append(
+                f"| naive_amplicon_caught | {len(report['naive_caught_invariants'])}/{report['naive_total_invariants']} | "
                 f"{', '.join(report['naive_caught_invariants'])} |"
             )
             print("\n".join(lines))

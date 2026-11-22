@@ -130,6 +130,16 @@ bioeval-guard self-check
 - **6-Invariant Generative De Novo Bio-Design Screening Auditor** (`bioeval_guard.de_novo_design_screening_audit` & `DefensiveDesignScreener`): audits Gibson/overlap-extension reverse-complement junction reconstruction, Type IIS `BsaI`/`BsmBI` scarless Golden Gate overhang ligation, split-intein (`DnaE`) protein trans-splicing, 0%-DNA-15mer synonymous rare-codon back-translation, cross-frame `+1` programmed ribosomal frameshift indel bridging, and fail-closed `<mask>`/`<pad>` generative token rejection using strictly benign synthetic reporter tags (`Strep-II`/`SpyTag`).
 - **Agentic Verifier Confidence & Transcript Provenance Auditors** (`audit_verifier_confidence_fail_closed`, `fail_closed_verifier_gate`, `audit_agent_transcript_injection_resistance`, `provenance_safe_transcript_turn_filter`): enforces fail-closed review triggers when judge confidence is `None`, `NaN`, boolean, or out-of-range (`transect#90`), blocks self-authored `[assistant turn failed` turn-deletion exploits (`transect#87`), and neutralizes Unicode/LF/CRLF newline key injection in sub-agent metadata (`transect#89/#91`).
 
+### v1.2.0 Tiled-Amplicon & Wastewater Surveillance + Error-Isolated Honesty & Agent-Tool Gate Auditors
+
+```bash
+bioeval-guard amplicon-audit
+bioeval-guard self-check
+```
+
+- **6-Invariant Tiled-Amplicon & Wastewater Surveillance Auditor** (`bioeval_guard.amplicon_surveillance_audit` & `DefensiveAmpliconSurveillanceAuditor`): audits 5'/3' primer-binding-site clipping prior to variant calling, symmetrical short-insert 3' read-through trimming across strands, duplicate reference deduplication parity (`augur#1892`), low-depth site masking (`N`/`NaN` without `0.0` wild-type coercion), non-negative simplex wastewater lineage deconvolution with explicit unexplained cryptic residual tracking, and negative-template control (NTC) contamination fail-closed gating on strictly benign synthetic GFP-derived reporter sequences.
+- **Error-Isolated Honesty & Agentic Empty-Tool Gate Auditors** (`error_isolated_honesty_score`, `audit_honesty_error_denominator_isolation`, `non_empty_tool_call_semantic_gate`, `audit_empty_tool_args_judge_gate`): prevents unparseable/whitespace-only judge outputs from crashing or inflating honesty denominators (`mask` `#2896`/`#2623`) and blocks uncalled `"{}"` or schema-mismatched tool arguments from reaching LLM semantic judges (`agentharm` `#2895`/`#2893`).
+
 ## Author & Contact
 
 - **Author:** Göktuğ Özkan, MD (`drozkan2@gmail.com`, ORCID: `0000-0002-5022-9124`)
