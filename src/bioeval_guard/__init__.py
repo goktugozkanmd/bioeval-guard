@@ -1,5 +1,6 @@
 """bioeval_guard: Deterministic biosecurity and AIxBio benchmark integrity auditor."""
 
+from .cluster_stats import audit_clustered_benchmark_se
 from .grader_audit import (
     audit_answer_tag_parser,
     audit_dna_screener_symmetry,
@@ -42,6 +43,7 @@ __all__ = [
     "LAB_BENCH_DATASET_REVISION",
     "LAB_BENCH_REVISION_PIN",
     "audit_answer_tag_parser",
+    "audit_clustered_benchmark_se",
     "audit_dna_screener_symmetry",
     "audit_numeric_string_verifier",
     "audit_question_blind_shortcuts",
@@ -66,4 +68,4 @@ __all__ = [
     "sanitize_mcq_dataset",
 ]
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"

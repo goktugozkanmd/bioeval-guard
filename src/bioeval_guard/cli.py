@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from .cluster_stats import audit_clustered_benchmark_se
 from .grader_audit import run_reference_self_check
 from .hygiene import (
     check_bixbench_hygiene,
@@ -77,7 +78,29 @@ def build_parser() -> argparse.ArgumentParser:
 
     psc = sub.add_parser("self-check", help="Verify reference hardened vs vulnerable grader/screener checks.")
     psc.add_argument("--json", action="store_true", help="Emit JSON output.")
+
+    pca = sub.add_parser(
+        "cluster-audit",
+        help="Compute cluster-robust SE, ICC, DEFF, and effective N on grouped eval records.",
+    )
+    pca.add_argument("path", type=Path, help="Path to scored JSON, JSONL, or Parquet file.")
+    pca.add_argument("--score-field", type=str, default="score", help="Numeric score field name.")
+    pca.add_argument("--cluster-field", type=str, default="cluster_id", help="Cluster identifier field name.")
+    pca.add_argument("--json", action="store_true", help="Emit JSON instead of Markdown.")
     return parser
+
+
+def format_cluster_markdown(report: dict[str, Any]) -> str:
+    """Format cluster-robust audit metrics as a single-row Markdown table."""
+    lines = [
+        "| N | Clusters | Mean | Naive SE | Cluster SE | SE Inflation | ICC | DEFF | N_eff |",
+        "|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+        f"| {report['n_items']} | {report['n_clusters']} | {report['mean']:.4f} | "
+        f"{report['naive_se']:.4f} | {report['cluster_se'] if report['cluster_se'] is not None else 'NaN'} | "
+        f"{report['se_inflation_factor']:.2f}x | {report['icc_anova']:.3f} | "
+        f"{report['design_effect_kish']:.2f} | {report['effective_n_cluster_se']:.1f} |",
+    ]
+    return "\n".join(lines)
 
 
 def format_self_check_markdown(report: dict[str, Any]) -> str:
@@ -123,6 +146,17 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(format_self_check_markdown(report))
         return 0 if report["hardened_all_passed"] else 1
+
+    if args.command == "cluster-audit":
+        records = load_records(args.path)
+        scores = [float(rec[args.score_field]) for rec in records]
+        clusters = [str(rec[args.cluster_field]) for rec in records]
+        report = audit_clustered_benchmark_se(scores, clusters)
+        if args.json:
+            print(json.dumps(report, indent=2))
+        else:
+            print(format_cluster_markdown(report))
+        return 0
 
     return 1
 

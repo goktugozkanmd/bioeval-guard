@@ -11,6 +11,7 @@ import pyarrow.parquet as pq
 import pytest
 
 from bioeval_guard.cli import format_markdown_summary, main
+from bioeval_guard.cluster_stats import audit_clustered_benchmark_se
 from bioeval_guard.grader_audit import (
     audit_answer_tag_parser,
     audit_dna_screener_symmetry,
@@ -445,3 +446,49 @@ def test_inspect_tasks_helpers_and_self_check_cli(capsys: pytest.CaptureFixture[
     assert payload["hardened_all_passed"] is True
     assert main(["self-check"]) == 0
     assert "| dna_screener_symmetry |" in capsys.readouterr().out
+
+
+def test_clustered_benchmark_se_invariants_and_cli(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # 1. Singleton clusters (n_c = 1): cluster SE must equal naive SE identically.
+    single_scores = [1, 0, 1, 1, 0, 0, 1, 0]
+    single_ids = [f"q{i}" for i in range(len(single_scores))]
+    single_rep = audit_clustered_benchmark_se(single_scores, single_ids)
+    assert single_rep["cluster_se"] == pytest.approx(single_rep["naive_se"], abs=1e-6)
+    assert single_rep["se_inflation_factor"] == pytest.approx(1.0, abs=1e-3)
+    assert single_rep["design_effect_kish"] == pytest.approx(1.0, abs=1e-6)
+
+    # 2. Within-capsule correlation (identical answers inside each capsule of size 5):
+    # ICC = 1.0, DEFF = 5.0, N_eff = K, SE inflation = sqrt(m_eff * ...) > 2x.
+    corr_scores = [1] * 5 + [0] * 5 + [1] * 5 + [0] * 5 + [1] * 5 + [0] * 5
+    corr_ids = [f"cap_{i // 5}" for i in range(len(corr_scores))]
+    corr_rep = audit_clustered_benchmark_se(corr_scores, corr_ids)
+    assert corr_rep["n_items"] == 30
+    assert corr_rep["n_clusters"] == 6
+    assert corr_rep["icc_anova"] == pytest.approx(1.0, abs=1e-4)
+    assert corr_rep["design_effect_kish"] == pytest.approx(5.0, abs=1e-4)
+    assert corr_rep["effective_n_kish"] == pytest.approx(6.0, abs=1e-2)
+    assert corr_rep["se_inflation_factor"] > 2.0
+    assert corr_rep["cluster_ci95"][0] < corr_rep["naive_ci95"][0]
+    assert corr_rep["cluster_ci95"][1] > corr_rep["naive_ci95"][1]
+
+    # 3. Validation errors
+    with pytest.raises(ValueError, match="equal length"):
+        audit_clustered_benchmark_se([1, 0], ["c1"])
+    with pytest.raises(ValueError, match="non-empty"):
+        audit_clustered_benchmark_se([], [])
+
+    # 4. CLI integration
+    jpath = tmp_path / "capsules.jsonl"
+    jpath.write_text(
+        "\n".join(
+            json.dumps({"score": s, "cluster_id": c}) for s, c in zip(corr_scores, corr_ids)
+        ),
+        encoding="utf-8",
+    )
+    assert main(["cluster-audit", str(jpath), "--json"]) == 0
+    cli_payload = json.loads(capsys.readouterr().out)
+    assert cli_payload["n_clusters"] == 6
+    assert main(["cluster-audit", str(jpath)]) == 0
+    assert "| 30 | 6 |" in capsys.readouterr().out
