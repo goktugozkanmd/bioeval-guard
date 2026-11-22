@@ -16,17 +16,21 @@ from bioeval_guard.grader_audit import (
     audit_answer_tag_parser,
     audit_dna_screener_symmetry,
     audit_mcq_option_text_grader,
+    audit_multiselect_mcq_grader,
     audit_numeric_string_verifier,
     audit_safety_judge_callable,
     audit_selective_precision_metric,
     audit_truncated_empty_completion_handling,
+    audit_ungraded_epoch_harm_reducer,
     audit_unparseable_judge_nan_handling,
     case_safe_judge_label,
     hardened_mcq_option_grader,
+    hardened_multiselect_mcq_grader,
     nan_safe_selective_precision,
     parse_tagged_answer_strict,
     run_reference_self_check,
     truncation_safe_answer_gate,
+    ungraded_safe_epoch_harm_reducer,
     unparseable_safe_nan_judge_score,
 )
 from bioeval_guard.hygiene import (
@@ -63,6 +67,14 @@ from bioeval_guard.phylodynamic_surveillance_audit import (
     DefensivePhylodynamicScreener,
     audit_phylodynamic_surveillance_pipeline,
     run_phylodynamic_self_check,
+)
+from bioeval_guard.protein_screening_audit import (
+    SYNTHETIC_NEGATIVE_PEPTIDE,
+    SYNTHETIC_REPORTER_MOTIF,
+    SYNTHETIC_REPORTER_PEPTIDE,
+    DefensiveProteinScreener,
+    audit_protein_screener,
+    run_protein_screening_self_check,
 )
 from bioeval_guard.sequence_screening_audit import (
     SYNTHETIC_CONTROL_KMER,
@@ -529,7 +541,7 @@ def test_inspect_tasks_helpers_and_self_check_cli(
 
     self_rep = run_reference_self_check()
     assert self_rep["hardened_all_passed"] is True
-    assert self_rep["vulnerable_caught"] == self_rep["vulnerable_total"] == 6
+    assert self_rep["vulnerable_caught"] == self_rep["vulnerable_total"] == 8
 
     assert main(["self-check", "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
@@ -539,6 +551,8 @@ def test_inspect_tasks_helpers_and_self_check_cli(
     assert "| mcq_option_text_grader |" in out_md
     assert "| unparseable_judge_nan_handling |" in out_md
     assert "| truncated_empty_completion_handling |" in out_md
+    assert "| multiselect_mcq_grader |" in out_md
+    assert "| ungraded_epoch_harm_reducer |" in out_md
 
 
 def test_mcq_option_text_grader_auditor_catches_end_letter_inversion() -> None:
@@ -794,3 +808,99 @@ def test_phylodynamic_surveillance_invariants_and_cli(
     out_md = capsys.readouterr().out
     assert "| sequence_metadata_index_parity | PASS |" in out_md
     assert "| horvitz_thompson_sampling_depletion | PASS |" in out_md
+
+
+def test_protein_screening_invariants_and_cli(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    screener = DefensiveProteinScreener()
+    rep = audit_protein_screener(
+        screener_fn=screener.screen,
+        segment_screener_fn=screener.screen_segments,
+        circular_screener_fn=lambda s: screener.screen(s, circular=True),
+    )
+    assert rep["passed"] is True
+    assert rep["passed_count"] == rep["total_invariants"] == 6
+
+    # Verify benign reporter vs negative control, malformed bracket & mid-line '>' guards
+    assert screener.screen(SYNTHETIC_REPORTER_PEPTIDE)["flagged"] is True
+    assert screener.screen(SYNTHETIC_NEGATIVE_PEPTIDE)["flagged"] is False
+    assert (
+        screener.screen(
+            f">benign_header_with_{SYNTHETIC_REPORTER_MOTIF}\n{SYNTHETIC_NEGATIVE_PEPTIDE}"
+        )["flagged"]
+        is False
+    )
+    with pytest.raises(ValueError, match="Mismatched|Unclosed"):
+        screener.screen("W(SEP]HPQFEKGGSG")
+    with pytest.raises(ValueError, match="header injection"):
+        screener.screen("MGHSHHH>fake_header")
+
+    self_prot = run_protein_screening_self_check()
+    assert self_prot["hardened_passed"] is True
+    assert len(self_prot["naive_caught_invariants"]) == 6
+    assert "three_letter_iupac_dealiasing" in self_prot["naive_caught_invariants"]
+    assert (
+        "six_frame_synonymous_backtranslation" in self_prot["naive_caught_invariants"]
+    )
+    assert (
+        "modified_residue_token_normalization" in self_prot["naive_caught_invariants"]
+    )
+    assert "circular_and_split_fusion_boundary" in self_prot["naive_caught_invariants"]
+    assert (
+        "ambiguous_bzj_expansion_and_x_fail_closed"
+        in self_prot["naive_caught_invariants"]
+    )
+    assert (
+        "chimeric_scaffold_localization_and_specificity"
+        in self_prot["naive_caught_invariants"]
+    )
+
+    assert main(["protein-audit", "--json"]) == 0
+    cli_json = json.loads(capsys.readouterr().out)
+    assert cli_json["hardened_passed"] is True
+    assert main(["protein-audit"]) == 0
+    out_md = capsys.readouterr().out
+    assert "| three_letter_iupac_dealiasing | PASS |" in out_md
+    assert "| six_frame_synonymous_backtranslation | PASS |" in out_md
+
+
+def test_multiselect_mcq_and_ungraded_epoch_harm_auditors() -> None:
+    import math
+
+    assert (
+        hardened_multiselect_mcq_grader("C, A", ["A", "B", "C", "D"], {"A", "C"})
+        is True
+    )
+    assert (
+        hardened_multiselect_mcq_grader(
+            "Option B is unsafe.\nANSWER: A and C", ["A", "B", "C", "D"], {"A", "C"}
+        )
+        is True
+    )
+    assert (
+        hardened_multiselect_mcq_grader("A", ["A", "B", "C", "D"], {"A", "C"}) is False
+    )
+
+    bad_ms = audit_multiselect_mcq_grader(
+        lambda s, _v, tgt: s.strip() == ", ".join(sorted(tgt))
+    )
+    assert bad_ms["passed"] is False
+    good_ms = audit_multiselect_mcq_grader(hardened_multiselect_mcq_grader)
+    assert good_ms["passed"] is True
+    assert good_ms["probes_run"] == 9
+
+    assert math.isnan(ungraded_safe_epoch_harm_reducer(["INVALID", None, float("nan")]))
+    assert ungraded_safe_epoch_harm_reducer([1.0, "INVALID", 0.0]) == pytest.approx(0.5)
+    assert ungraded_safe_epoch_harm_reducer([0.0, 0.0]) == pytest.approx(0.0)
+
+    bad_red = audit_ungraded_epoch_harm_reducer(
+        lambda xs: (
+            sum(0.0 if (x is None or isinstance(x, str)) else float(x) for x in xs)
+            / len(xs)
+        )
+    )
+    assert bad_red["passed"] is False
+    good_red = audit_ungraded_epoch_harm_reducer(ungraded_safe_epoch_harm_reducer)
+    assert good_red["passed"] is True
+    assert good_red["probes_run"] == 5

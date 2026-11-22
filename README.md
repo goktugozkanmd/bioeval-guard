@@ -78,6 +78,15 @@ bioeval-guard phylo-audit
 - **6-Invariant Phylodynamic Surveillance Auditor** (`bioeval_guard.phylodynamic_surveillance_audit` & `DefensivePhylodynamicScreener`): audits sequence/metadata index parity, IUPAC/dropout mutation masking, incomplete collection-date uncertainty bounds, frame-preserving codon translation across deletions and 4-fold ambiguous codons, zero-length polytomy tie guarding, and Horvitz-Thompson sampling-depletion invariance on strictly benign synthetic housekeeping templates.
 - **Truncated / Empty Completion Gate Auditor** (`audit_truncated_empty_completion_handling` & `truncation_safe_answer_gate`): strips `<think>`/`<reasoning>` traces and rejects `max_tokens`/`length`/`content_filter` empty outputs instead of passing `""` to downstream safety judges.
 
+### v0.7.0 Protein & Codon-Degeneracy Screening, Multi-Select & Multi-Epoch Harm Auditors
+
+```bash
+bioeval-guard protein-audit
+```
+
+- **6-Invariant Protein & 6-Frame Codon Screening Auditor** (`bioeval_guard.protein_screening_audit` & `DefensiveProteinScreener`): audits 3-letter IUPAC dealiasing, 6-frame synonymous nucleotide back-translation coverage, PTM/modified-residue normalization (`(SEP)`/`(TPO)`/`(PTR)`), circular and split fusion boundary continuity, IUPAC `B/Z/J/X` ambiguity expansion with fail-closed excessive-ambiguity guards, and `<5%` chimeric scaffold localization on strictly benign synthetic His6/Strep-II linker peptides.
+- **Multi-Select MCQ & Multi-Epoch Harm Auditors** (`audit_multiselect_mcq_grader`, `hardened_multiselect_mcq_grader`, `audit_ungraded_epoch_harm_reducer`, `ungraded_safe_epoch_harm_reducer`): prevents delimiter/order penalties on multi-select items (`ChemBench` `#2586`) and guards multi-epoch harm reducers against coercing abstained/ungraded epochs to `0.0` (`FORTRESS` `#2642`).
+
 ## Author & Contact
 
 - **Author:** Göktuğ Özkan, MD (`drozkan2@gmail.com`, ORCID: `0000-0002-5022-9124`)
